@@ -139,7 +139,7 @@
                   :class="generateForm.productIds.includes(prod.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
                   @click="toggleProductId(prod.id)">
                   <template x-if="prod.images && prod.images.length">
-                    <img :src="blobUrl(prod.images[0].blob)" class="w-10 h-10 rounded object-cover bg-bg-elev flex-shrink-0">
+                    <img :src="imgSrc(prod.images[0])" class="w-10 h-10 rounded object-cover bg-bg-elev flex-shrink-0">
                   </template>
                   <template x-if="!prod.images || !prod.images.length">
                     <div class="w-10 h-10 rounded bg-bg-elev flex-shrink-0 flex items-center justify-center text-muted text-xs">?</div>
@@ -600,12 +600,15 @@
       <div class="grid grid-cols-3 gap-4">
         <template x-for="prod in products" :key="prod.id">
           <div class="card overflow-hidden cursor-pointer hover:border-accent transition" @click="openProductModal(prod)">
-            <div class="aspect-video bg-bg-elev">
+            <div class="aspect-video bg-bg-elev relative">
               <template x-if="prod.images && prod.images.length">
-                <img :src="blobUrl(prod.images[0].blob)" class="w-full h-full object-cover">
+                <img :src="imgSrc(prod.images[0])" class="w-full h-full object-cover">
               </template>
               <template x-if="!prod.images || !prod.images.length">
                 <div class="w-full h-full flex items-center justify-center text-muted text-xs">No image</div>
+              </template>
+              <template x-if="prod.fromShopify">
+                <span class="absolute top-2 right-2 chip text-xs" style="background:#96bf48;color:#fff;font-size:0.6rem">Shopify</span>
               </template>
             </div>
             <div class="p-3">
@@ -984,6 +987,19 @@
         <button class="btn btn-secondary text-sm" @click="loadNotionConfig()">↻ Reload from Notion</button>
       </div>
 
+      <!-- SHOPIFY -->
+      <div class="card p-6 mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold text-zinc-100">Shopify</h2>
+          <span class="chip"
+            :class="shopifyStatus==='ok' ? 'chip-success' : shopifyStatus==='error' ? 'chip-danger' : 'chip-muted'"
+            x-text="shopifyStatus==='ok' ? 'Shopify synced' : shopifyStatus==='error' ? 'Shopify offline' : 'Not loaded'"></span>
+        </div>
+        <p class="text-xs text-muted mb-3">Products are synced automatically from your Shopify store on startup.</p>
+        <div x-show="shopifyStatus==='error'" class="text-xs text-danger mb-3" x-text="'Error: ' + shopifyLastError"></div>
+        <button class="btn btn-secondary text-sm" @click="loadShopifyProducts()">↻ Reload from Shopify</button>
+      </div>
+
       <!-- ABOUT -->
       <div class="card p-6">
         <h2 class="text-base font-semibold text-zinc-100 mb-1">About</h2>
@@ -1026,8 +1042,10 @@ function app() {
     dragState: null,
     blobUrlCache: new Map(),
     refTab: 'competitor',
-    notionStatus: 'idle',   // 'idle' | 'ok' | 'error'
+    notionStatus: 'idle',    // 'idle' | 'ok' | 'error'
     notionLastError: '',
+    shopifyStatus: 'idle',   // 'idle' | 'ok' | 'error'
+    shopifyLastError: '',
 
     // ---- State: references, products ----
     references: [],
@@ -1305,6 +1323,8 @@ function app() {
 
       // Load brand config from Notion (non-blocking, falls back silently)
       this.loadNotionConfig();
+      // Sync products from Shopify (non-blocking, falls back silently)
+      this.loadShopifyProducts();
     },
 
     resetModelEndpointsToDefaults() {
@@ -1431,6 +1451,140 @@ function app() {
         this.notionLastError = e.message;
         console.warn('[notion] Failed to load brand config (using hardcoded defaults):', e.message);
       }
+    },
+
+    // ============================================================
+    // SHOPIFY SYNC
+    // ============================================================
+    async loadShopifyProducts() {
+      this.shopifyStatus = 'idle';
+      this.shopifyLastError = '';
+
+      const mapCategory = (type) => {
+        const t = (type || '').toLowerCase();
+        if (t.includes('trocken') || t.includes('dry'))   return 'Dry Food';
+        if (t.includes('nass')    || t.includes('wet'))   return 'Wet Food';
+        if (t.includes('snack')   || t.includes('treat')) return 'Snacks & Treats';
+        if (t.includes('supplement'))                     return 'Supplements';
+        if (t.includes('bundle'))                         return 'Bundle';
+        return 'Other';
+      };
+
+      const detectFlavor = (title) => {
+        const flavors = ['Lachs','Huhn','Rind','Thunfisch','Ente','Kaninchen','Pute'];
+        return flavors.find(f => title.toLowerCase().includes(f.toLowerCase())) || '';
+      };
+
+      const stripHtml = (html) =>
+        (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+
+      const sFetch = async (path) => {
+        const res = await fetch(`/shopify${path}`);
+        if (!res.ok) throw new Error(`Shopify ${res.status} on ${path}`);
+        return res.json();
+      };
+
+      try {
+        // Find the target collection (try custom, then smart)
+        let collectionId = null;
+        const [customData, smartData] = await Promise.all([
+          sFetch('/custom_collections.json?limit=250').catch(() => ({ custom_collections: [] })),
+          sFetch('/smart_collections.json?limit=250').catch(() => ({ smart_collections: [] })),
+        ]);
+        const allCollections = [
+          ...(customData.custom_collections || []),
+          ...(smartData.smart_collections || []),
+        ];
+        const target = allCollections.find(c =>
+          c.title === 'Our Store' || c.handle === 'frontpage' || c.handle === 'all'
+        ) || allCollections[0];
+        if (target) collectionId = target.id;
+
+        // Fetch products
+        let shopifyProducts = [];
+        if (collectionId) {
+          const data = await sFetch(`/collections/${collectionId}/products.json?limit=250`);
+          shopifyProducts = data.products || [];
+        } else {
+          const data = await sFetch('/products.json?limit=250');
+          shopifyProducts = data.products || [];
+        }
+
+        // Filter out packs and map to app format
+        const filtered = shopifyProducts.filter(p =>
+          !p.title.toLowerCase().includes('pack')
+        );
+
+        for (const sp of filtered) {
+          const mapped = {
+            id: String(sp.id),
+            title: sp.title,
+            category: mapCategory(sp.product_type),
+            images: (sp.images || []).map(img => ({
+              id: String(img.id),
+              url: img.src,
+              name: sp.title,
+              blob: null,
+            })),
+            description: stripHtml(sp.body_html),
+            flavor: detectFlavor(sp.title),
+            ageRange: '',
+            keyIngredients: [],
+            nutritionNotes: '',
+            fromShopify: true,
+          };
+
+          // Merge: update existing Shopify product, skip manually added ones
+          const existingIdx = this.products.findIndex(p => String(p.id) === String(sp.id));
+          if (existingIdx >= 0) {
+            if (this.products[existingIdx].fromShopify) {
+              // Preserve any blobs already fetched
+              const existingImages = this.products[existingIdx].images || [];
+              mapped.images = mapped.images.map(img => {
+                const prev = existingImages.find(e => e.id === img.id);
+                return prev?.blob ? { ...img, blob: prev.blob } : img;
+              });
+              this.products.splice(existingIdx, 1, mapped);
+            }
+          } else {
+            this.products.push(mapped);
+            // Auto-select newly synced products
+            if (!this.generateForm.productIds.includes(mapped.id)) {
+              this.generateForm.productIds.push(mapped.id);
+            }
+          }
+        }
+
+        this.shopifyStatus = 'ok';
+        console.log(`[shopify] Synced ${filtered.length} products`);
+      } catch(e) {
+        this.shopifyStatus = 'error';
+        this.shopifyLastError = e.message;
+        console.warn('[shopify] Sync failed (using existing products):', e.message);
+      }
+    },
+
+    // Lazy-fetch blobs for Shopify product images just before generation
+    async fetchProductImageBlobs() {
+      for (const prod of this.selectedProducts) {
+        for (const img of (prod.images || [])) {
+          if (!img.blob && img.url) {
+            try {
+              const res = await fetch(img.url);
+              if (res.ok) img.blob = await res.blob();
+            } catch(e) {
+              console.warn('[shopify] Failed to fetch image blob:', img.url, e.message);
+            }
+          }
+        }
+      }
+    },
+
+    // Return the right src for a product image (blob URL or direct URL)
+    imgSrc(img) {
+      if (!img) return '';
+      if (img.blob) return this.blobUrl(img.blob);
+      return img.url || '';
     },
 
     loadSettings() {
@@ -2094,7 +2248,9 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
       const f = this.generateForm;
       const kit = this.brandKit;
       const refs = f.referenceIds.map(id => this.referenceById(id)).filter(Boolean);
-      const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img => img.blob));
+      this.currentStep = 'Fetching product images…';
+      await this.fetchProductImageBlobs();
+      const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img => img.blob).filter(Boolean));
       const mascotBlobs = (kit.mascotImages||[]).map(m => m.blob);
 
       let jobs = [];
@@ -2274,7 +2430,8 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
 
         const f = this.generateForm;
         const kit = this.brandKit;
-        const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img=>img.blob));
+        await this.fetchProductImageBlobs();
+        const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img=>img.blob).filter(Boolean));
         const mascotBlobs = (kit?.mascotImages||[]).map(m => m.blob);
 
         if (this.settings.imageBackend === 'google') {

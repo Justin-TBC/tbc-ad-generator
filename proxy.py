@@ -21,9 +21,12 @@ from urllib.parse import urlparse
 UPSTREAM_BASE  = "https://mcp.higgsfield.ai"
 DEFAULT_PORT   = int(os.environ.get("PORT", 8000))
 PROXY_PREFIX   = "/api"
-NOTION_PREFIX  = "/notion"
-NOTION_BASE    = "https://api.notion.com/v1"
-NOTION_TOKEN   = os.environ.get("NOTION_TOKEN", "")
+NOTION_PREFIX   = "/notion"
+NOTION_BASE     = "https://api.notion.com/v1"
+NOTION_TOKEN    = os.environ.get("NOTION_TOKEN", "")
+SHOPIFY_PREFIX  = "/shopify"
+SHOPIFY_DOMAIN  = os.environ.get("SHOPIFY_DOMAIN", "")
+SHOPIFY_TOKEN   = os.environ.get("SHOPIFY_TOKEN", "")
 
 # Header die unveraendert an Higgsfield weitergegeben werden
 PASS_THROUGH_REQUEST_HEADERS = {
@@ -85,30 +88,38 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _is_notion(self):
         return self.path.startswith(NOTION_PREFIX + "/") or self.path == NOTION_PREFIX
 
+    def _is_shopify(self):
+        return self.path.startswith(SHOPIFY_PREFIX + "/") or self.path == SHOPIFY_PREFIX
+
     def do_GET(self):
-        if self._is_api():     self._proxy()
+        if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
-        else:                  super().do_GET()
+        elif self._is_shopify():self._shopify_proxy()
+        else:                   super().do_GET()
 
     def do_POST(self):
-        if self._is_api():     self._proxy()
+        if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
-        else:                  self.send_error(404)
+        elif self._is_shopify():self._shopify_proxy()
+        else:                   self.send_error(404)
 
     def do_PUT(self):
-        if self._is_api():     self._proxy()
+        if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
-        else:                  self.send_error(404)
+        elif self._is_shopify():self._shopify_proxy()
+        else:                   self.send_error(404)
 
     def do_DELETE(self):
-        if self._is_api():     self._proxy()
+        if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
-        else:                  self.send_error(404)
+        elif self._is_shopify():self._shopify_proxy()
+        else:                   self.send_error(404)
 
     def do_PATCH(self):
-        if self._is_api():     self._proxy()
+        if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
-        else:                  self.send_error(404)
+        elif self._is_shopify():self._shopify_proxy()
+        else:                   self.send_error(404)
 
     # --- Proxy core ---
     def _proxy(self):
@@ -147,6 +158,43 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 f'{{"error":"proxy_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
+            )
+
+    # --- Shopify proxy ---
+    def _shopify_proxy(self):
+        if not SHOPIFY_DOMAIN:
+            self.send_response(503)
+            self._add_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"SHOPIFY_DOMAIN not set"}')
+            return
+        shopify_path = self.path[len(SHOPIFY_PREFIX):] or "/"
+        url = f"https://{SHOPIFY_DOMAIN}/admin/api/2024-01{shopify_path}"
+        method = self.command
+
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        body = self.rfile.read(length) if length else None
+
+        req = urllib.request.Request(url, data=body, method=method)
+        req.add_header("X-Shopify-Access-Token", SHOPIFY_TOKEN)
+        req.add_header("Content-Type", "application/json")
+
+        sys.stderr.write(f"[shopify] {method} {url}\n")
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                self._relay(resp.status, resp.getheaders(), resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read()
+            self._relay(e.code, e.headers.items(), body)
+        except urllib.error.URLError as e:
+            self.send_response(502)
+            self._add_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                f'{{"error":"shopify_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
             )
 
     # --- Notion proxy ---
