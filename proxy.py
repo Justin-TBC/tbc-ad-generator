@@ -171,7 +171,7 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 def main():
     port = int(os.environ.get("PORT", int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PORT))
-    with ThreadingHTTPServer(("127.0.0.1", port), Handler) as httpd:
+    with ThreadingHTTPServer(("0.0.0.0", port), Handler) as httpd:
         print(f"==> Ad Generator on http://localhost:{port}/ad-generator.html")
         print(f"==> Proxy {PROXY_PREFIX}/* -> {UPSTREAM_BASE}/*")
         print("==> Ctrl+C zum Beenden")
