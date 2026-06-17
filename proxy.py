@@ -164,6 +164,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req.add_header("Content-Type", "application/json")
 
         sys.stderr.write(f"[notion] {method} {url}\n")
+        sys.stderr.write(f"[notion-token] token present: {bool(os.environ.get('NOTION_TOKEN'))}, length: {len(os.environ.get('NOTION_TOKEN', ''))}\n")
+        sys.stderr.write(f"[notion-auth] Authorization: {req.get_header('Authorization')}\n")
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
