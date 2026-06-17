@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pablo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            bg: { DEFAULT: '#0a0a0b', card: '#141416', elev: '#1c1c1f', border: '#2a2a2e' },
+            accent: { DEFAULT: '#f97316', soft: '#f9731620' },
+            danger: { DEFAULT: '#f43f5e', soft: '#f43f5e20' },
+            success: { DEFAULT: '#10b981', soft: '#10b98120' },
+            muted: '#71717a'
+          }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    [x-cloak] { display: none !important; }
+    input, select, textarea { color-scheme: dark; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0a0b; }
+    ::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3a3e; }
+    .card { background: #141416; border: 1px solid #2a2a2e; border-radius: 12px; }
+    .input { background: #1c1c1f; border: 1px solid #2a2a2e; border-radius: 8px; padding: 0.5rem 0.75rem; color: #e4e4e7; width: 100%; transition: border 0.15s; font-size: 0.875rem; }
+    .input:focus { outline: none; border-color: #f97316; }
+    .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 500; transition: all 0.15s; cursor: pointer; font-size: 0.875rem; display: inline-flex; align-items: center; gap: 0.5rem; }
+    .btn-primary { background: #f97316; color: #1a0f04; }
+    .btn-primary:hover { background: #ea6a13; }
+    .btn-primary:disabled { background: #44291a; color: #856749; cursor: not-allowed; }
+    .btn-secondary { background: #1c1c1f; color: #e4e4e7; border: 1px solid #2a2a2e; }
+    .btn-secondary:hover { background: #2a2a2e; }
+    .btn-danger { background: #f43f5e; color: #fff; }
+    .btn-danger:hover { background: #e1314f; }
+    .btn-ghost { color: #71717a; background: transparent; }
+    .btn-ghost:hover { color: #e4e4e7; background: #1c1c1f; }
+    .label { font-size: 0.75rem; font-weight: 500; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; display: block; }
+    .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.875rem; border-radius: 8px; color: #a1a1aa; cursor: pointer; transition: all 0.15s; font-size: 0.875rem; }
+    .nav-item:hover { background: #1c1c1f; color: #e4e4e7; }
+    .nav-item.active { background: #f9731615; color: #f97316; font-weight: 500; }
+    .chip { padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; display: inline-block; }
+    .chip-accent { background: #f9731620; color: #f97316; }
+    .chip-muted { background: #1c1c1f; color: #a1a1aa; border: 1px solid #2a2a2e; }
+    .chip-success { background: #10b98120; color: #10b981; }
+    .chip-blue { background: #1e3a5f; color: #60a5fa; }
+    .modal-bg { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+    .dropzone { border: 2px dashed #2a2a2e; border-radius: 8px; padding: 2rem; text-align: center; color: #71717a; transition: all 0.15s; cursor: pointer; }
+    .dropzone:hover, .dropzone.dragover { border-color: #f97316; color: #f97316; background: #f9731608; }
+    .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; z-index: 100; animation: slideIn 0.2s ease-out; }
+    .toast-success { background: #10b981; color: #052e1e; }
+    .toast-error { background: #f43f5e; color: #fff; }
+    .nav-divider { border-top: 1px solid #2a2a2e; margin: 4px 0; }
+    @keyframes slideIn { from { transform: translateX(10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  </style>
+</head>
+<body class="bg-bg text-zinc-200" x-data="app()" x-init="init()" x-cloak>
+<div class="flex h-screen">
+
+  <!-- SIDEBAR -->
+  <aside class="w-60 border-r border-bg-border bg-bg p-4 flex flex-col">
+    <div class="mb-6 px-2">
+      <div class="text-base font-semibold text-zinc-100 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-accent"></span>
+        Pablo
+      </div>
+      <div class="text-xs text-muted">The Better Cat Image Tool</div>
+    </div>
+    <nav class="space-y-0.5 flex-1">
+      <template x-for="item in nav" :key="item.id">
+        <div>
+          <div x-show="item.divider" class="nav-divider"></div>
+          <div x-show="!item.divider" class="nav-item" :class="{ active: view === item.id }" @click="view = item.id">
+            <span x-html="item.icon" class="w-4 h-4 flex-shrink-0 flex items-center justify-center"></span>
+            <span x-text="item.label"></span>
+          </div>
+        </div>
+      </template>
+    </nav>
+    <div class="text-xs text-muted px-2 pt-4 border-t border-bg-border">
+      <div x-text="products.length + ' Products'"></div>
+      <div class="mt-1" x-text="(references.length + ownReferences.length) + ' References'"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 overflow-y-auto p-8">
+
+    <!-- ===================== GENERATE (Ads + Shop) ===================== -->
+    <section x-show="isGenerateView">
+      <h1 class="text-2xl font-semibold text-zinc-100 mb-2" x-text="genType === 'shop' ? 'Online Shop Images' : 'Ads'"></h1>
+      <p class="text-sm text-muted mb-6" x-text="genType === 'shop' ? 'Product page images for your shop: Hero, Lifestyle, Benefit Graphic and Clean Product.' : 'Choose references as inspiration, set format and count, generate.'"></p>
+
+      <div class="grid grid-cols-[400px_1fr] gap-6">
+        <!-- LEFT: BRIEF FORM -->
+        <div class="card p-5 space-y-5 self-start sticky top-0">
+
+          <!-- Backend indicator chip -->
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-muted font-semibold uppercase tracking-wider">Brief</span>
+            <button @click="view='settings'" class="chip cursor-pointer hover:opacity-80 transition"
+              :class="settings.imageBackend==='google' ? 'chip-blue' : 'chip-accent'"
+              x-text="settings.imageBackend==='google' ? '⚡ Google Gemini' : '⚡ Higgsfield'"></button>
+          </div>
+
+          <!-- Angle selector -->
+          <div>
+            <label class="label">Campaign Angle</label>
+            <select class="input" x-model="generateForm.angle">
+              <option value="">— no specific angle —</option>
+              <template x-for="a in brandKit.angles" :key="a">
+                <option :value="a" x-text="a"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Product picker -->
+          <div>
+            <label class="label">Products</label>
+            <div x-show="products.length === 0" class="text-xs text-danger">
+              No products yet. <button class="underline" @click="view='products'">Add products</button>
+            </div>
+            <div x-show="products.length > 0" class="grid grid-cols-2 gap-2">
+              <template x-for="prod in products" :key="prod.id">
+                <div class="card p-2 cursor-pointer ring-2 transition flex items-center gap-2"
+                  :class="generateForm.productIds.includes(prod.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
+                  @click="toggleProductId(prod.id)">
+                  <template x-if="prod.images && prod.images.length">
+                    <img :src="blobUrl(prod.images[0].blob)" class="w-10 h-10 rounded object-cover bg-bg-elev flex-shrink-0">
+                  </template>
+                  <template x-if="!prod.images || !prod.images.length">
+                    <div class="w-10 h-10 rounded bg-bg-elev flex-shrink-0 flex items-center justify-center text-muted text-xs">?</div>
+                  </template>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs font-medium text-zinc-100 truncate" x-text="prod.title"></div>
+                    <span class="chip chip-muted text-xs" style="font-size:0.65rem" x-text="prod.category"></span>
+                  </div>
+                  <div x-show="generateForm.productIds.includes(prod.id)" class="w-4 h-4 rounded-full bg-accent text-bg flex items-center justify-center text-xs flex-shrink-0">✓</div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Gemini warning -->
+          <div x-show="settings.imageBackend === 'google'" class="chip chip-blue text-xs py-1.5 px-2 w-full text-center" style="border-radius:6px">
+            ⚠ Google Gemini — references act as style inspiration only (no layout transfer)
+          </div>
+
+          <!-- References -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="label mb-0" x-text="genType === 'shop' ? 'References (Style Inspiration, optional)' : 'References (Inspiration)'"></label>
+              <button class="text-xs text-accent hover:underline" @click="refPickerOpen = true">+ Select</button>
+            </div>
+            <div x-show="generateForm.referenceIds.length === 0" class="text-xs text-muted">No references selected. Click "Select".</div>
+            <div x-show="generateForm.referenceIds.length > 0" class="grid grid-cols-3 gap-2">
+              <template x-for="refId in generateForm.referenceIds" :key="refId">
+                <template x-if="referenceById(refId)">
+                  <div class="relative group">
+                    <img :src="blobUrl(referenceById(refId).imageBlob)" class="aspect-square w-full object-cover rounded bg-bg-elev">
+                    <button class="absolute top-1 right-1 w-5 h-5 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100" @click="generateForm.referenceIds = generateForm.referenceIds.filter(x => x !== refId)">✕</button>
+                  </div>
+                </template>
+              </template>
+            </div>
+          </div>
+
+          <!-- Mode (ads only, multi-ref) -->
+          <div x-show="genType === 'ads' && generateForm.referenceIds.length > 1">
+            <label class="label">Mode</label>
+            <select class="input" x-model="generateForm.mode">
+              <option value="per-ref">One variant per reference</option>
+              <option value="consolidated">One consolidated variant</option>
+            </select>
+          </div>
+
+          <!-- Shop image types -->
+          <div x-show="genType === 'shop'">
+            <label class="label">Image Types</label>
+            <div class="space-y-2">
+              <template x-for="tpl in shopTemplates" :key="tpl.id">
+                <div class="card p-3 cursor-pointer ring-2 transition flex items-start gap-3"
+                  :class="generateForm.shopTemplateIds.includes(tpl.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
+                  @click="toggleShopTemplate(tpl.id)">
+                  <div class="w-5 h-5 mt-0.5 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                    :class="generateForm.shopTemplateIds.includes(tpl.id) ? 'bg-accent text-bg' : 'border border-bg-border text-transparent'">✓</div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-zinc-100" x-text="tpl.label"></span>
+                      <span class="chip chip-muted text-xs" x-text="tpl.aspect"></span>
+                    </div>
+                    <div class="text-xs text-muted mt-0.5" x-text="tpl.desc"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="text-xs text-muted mt-1">Format is set automatically per image type.</div>
+          </div>
+
+          <!-- Format / Model / Quality / Resolution -->
+          <div class="grid grid-cols-2 gap-3">
+            <div x-show="genType === 'ads'">
+              <label class="label">Format</label>
+              <select class="input" x-model="generateForm.aspect">
+                <option value="1:1">1:1 Meta Feed</option>
+                <option value="4:5">4:5 Portrait</option>
+                <option value="9:16">9:16 Story</option>
+                <option value="16:9">16:9 Landscape</option>
+              </select>
+            </div>
+            <div x-show="settings.imageBackend !== 'google'">
+              <label class="label">Model</label>
+              <select class="input" x-model="generateForm.model">
+                <template x-for="[key, ep] in Object.entries(settings.modelEndpoints || {})" :key="key">
+                  <option :value="key" :selected="key === generateForm.model" x-text="key"></option>
+                </template>
+              </select>
+            </div>
+            <div x-show="settings.imageBackend !== 'google'">
+              <label class="label">Quality</label>
+              <select class="input" x-model="generateForm.quality">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div x-show="settings.imageBackend !== 'google'">
+              <label class="label">Resolution</label>
+              <select class="input" x-model="generateForm.resolution">
+                <option value="720p">720p (Soul)</option>
+                <option value="1080p">1080p (Soul/Flux)</option>
+                <option value="1k">1k (GPT/Nano)</option>
+                <option value="2k">2k (GPT/Nano)</option>
+                <option value="4k">4k (GPT/Nano)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Count -->
+          <div x-show="(genType==='ads'&&(generateForm.mode==='consolidated'||generateForm.referenceIds.length<=1))||(genType==='shop'&&generateForm.shopTemplateIds.length<=1)">
+            <label class="label" x-text="genType==='shop' ? 'Variants per Image Type' : 'Variants'"></label>
+            <input type="number" class="input" x-model.number="generateForm.count" min="1" max="4">
+          </div>
+
+          <!-- Send images toggle -->
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" x-model="generateForm.sendImages" class="rounded">
+            <span>Send image references <span class="text-muted text-xs">(for image-to-image)</span></span>
+          </label>
+
+          <!-- Custom prompt -->
+          <div>
+            <label class="label">Additional Instructions (optional)</label>
+            <textarea class="input font-mono text-xs" rows="3" x-model="generateForm.customPrompt" placeholder="e.g. 'Large yellow headline', 'Cat on the left', 'more whitespace at top'"></textarea>
+            <div class="text-xs text-muted mt-1">Appended to the auto-prompt. High priority for the model.</div>
+          </div>
+
+          <!-- Generate button -->
+          <div class="flex gap-2">
+            <button class="btn btn-primary flex-1 justify-center" :disabled="!canGenerate() || generating" @click="runGenerate()">
+              <span x-show="!generating" x-text="'✨ Generate (' + plannedCount() + ')'"></span>
+              <span x-show="generating">Generating…</span>
+            </button>
+            <button class="btn btn-secondary" x-show="generating" @click="stopGenerating()">Stop</button>
+          </div>
+          <div x-show="!canGenerate() && !generating" class="text-xs text-danger space-y-0.5">
+            <div x-show="generateForm.productIds.length === 0">↑ Select at least one product above</div>
+            <div x-show="generateForm.productIds.length > 0 && genType === 'shop' && generateForm.shopTemplateIds.length === 0">↑ Select at least one image type</div>
+            <div x-show="generateForm.productIds.length > 0 && settings.imageBackend !== 'google' && !auth.accessToken && !(settings.higgsfieldKeyId && settings.higgsfieldKeySecret)">Not signed in to Higgsfield — go to <button class="underline" @click="view='settings'">Settings</button></div>
+            <div x-show="generateForm.productIds.length > 0 && settings.imageBackend === 'google' && !settings.googleApiKey">Google API Key missing — go to <button class="underline" @click="view='settings'">Settings</button></div>
+          </div>
+          <div x-show="generating && currentStep" class="text-xs text-muted" x-text="currentStep"></div>
+        </div>
+
+        <!-- RIGHT: OUTPUT GALLERY -->
+        <div>
+          <div x-show="!currentRun" class="card p-12 text-center text-muted text-sm">
+            Output will appear here after generating.
+          </div>
+          <div x-show="currentRun" class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold text-zinc-100">Current Run</h2>
+              <div class="text-xs text-muted" x-text="currentRun?.startedAt ? new Date(currentRun.startedAt).toLocaleTimeString('en-US') : ''"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <template x-for="(job, idx) in currentRun?.jobs || []" :key="idx">
+                <div class="card overflow-hidden">
+                  <div class="aspect-square bg-bg-elev relative">
+                    <template x-if="job.status === 'completed' && job.outputUrl">
+                      <img :src="job.outputUrl" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="job.status !== 'completed'">
+                      <div class="absolute inset-0 flex flex-col items-center justify-center text-muted">
+                        <div class="text-xs uppercase tracking-wider mb-2" x-text="job.status"></div>
+                        <div class="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" x-show="['in_progress','pending','queued'].includes(job.status)"></div>
+                        <div class="text-xs text-danger mt-2" x-show="job.error" x-text="job.error"></div>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="p-3 text-xs">
+                    <div class="text-muted" x-text="job.label"></div>
+                    <div class="flex gap-2 mt-2 flex-wrap" x-show="job.status === 'completed'">
+                      <button class="btn btn-secondary text-xs py-1 px-2" @click="downloadJob(job)">Download</button>
+                      <button class="btn btn-ghost text-xs py-1 px-2" @click="copyPrompt(job)">Prompt</button>
+                      <button class="btn btn-ghost text-xs py-1 px-2" @click="job.refineOpen = !job.refineOpen">↺ Improve</button>
+                    </div>
+                    <div x-show="job.refineOpen && job.status === 'completed'" class="mt-2 space-y-2">
+                      <textarea class="input text-xs" rows="3" x-model="job.refineText" placeholder="What should change? e.g. 'Mascot bigger and centered'"></textarea>
+                      <div class="flex gap-2">
+                        <button class="btn btn-primary text-xs py-1 px-2" :disabled="!job.refineText?.trim() || generating" @click="refineJob(job)">Send</button>
+                        <button class="btn btn-ghost text-xs py-1 px-2" @click="job.refineOpen = false">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REF PICKER MODAL -->
+      <div x-show="refPickerOpen" x-transition.opacity class="fixed inset-0 z-40 modal-bg flex items-start justify-center overflow-y-auto py-8" @click.self="refPickerOpen = false">
+        <div class="card w-full max-w-3xl mx-4 my-auto" @click.stop>
+          <div class="px-6 py-4 border-b border-bg-border flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-zinc-100">Select References</h2>
+            <button class="btn btn-ghost p-1" @click="refPickerOpen = false">✕</button>
+          </div>
+          <div class="p-6">
+            <div x-show="allTags.length" class="flex flex-wrap gap-2 mb-4">
+              <button class="chip" :class="filterTag === null ? 'chip-accent' : 'chip-muted'" @click="filterTag = null">All</button>
+              <template x-for="tag in allTags" :key="tag">
+                <button class="chip" :class="filterTag === tag ? 'chip-accent' : 'chip-muted'" @click="filterTag = filterTag === tag ? null : tag" x-text="tag"></button>
+              </template>
+            </div>
+            <!-- Competitor refs -->
+            <template x-if="pickerCompetitorRefs.length > 0">
+              <div>
+                <div class="text-xs text-muted font-semibold uppercase tracking-wider mb-2 mt-2">— Competitors —</div>
+                <div class="grid grid-cols-4 gap-3 mb-4">
+                  <template x-for="ref in pickerCompetitorRefs" :key="ref.id">
+                    <div class="card overflow-hidden cursor-pointer ring-2 transition"
+                      :class="generateForm.referenceIds.includes(ref.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
+                      @click="toggleRefSelect(ref.id)">
+                      <div class="aspect-square bg-bg-elev relative">
+                        <img :src="blobUrl(ref.imageBlob)" class="w-full h-full object-cover">
+                        <div x-show="generateForm.referenceIds.includes(ref.id)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent text-bg flex items-center justify-center text-xs font-bold">✓</div>
+                      </div>
+                      <div class="p-2 text-xs text-zinc-100 truncate" x-text="ref.name || 'Unnamed'"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <!-- Own refs -->
+            <template x-if="pickerOwnRefs.length > 0">
+              <div>
+                <div class="text-xs text-muted font-semibold uppercase tracking-wider mb-2">— Own Ads —</div>
+                <div class="grid grid-cols-4 gap-3">
+                  <template x-for="ref in pickerOwnRefs" :key="ref.id">
+                    <div class="card overflow-hidden cursor-pointer ring-2 transition"
+                      :class="generateForm.referenceIds.includes(ref.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
+                      @click="toggleRefSelect(ref.id)">
+                      <div class="aspect-square bg-bg-elev relative">
+                        <img :src="blobUrl(ref.imageBlob)" class="w-full h-full object-cover">
+                        <div x-show="generateForm.referenceIds.includes(ref.id)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent text-bg flex items-center justify-center text-xs font-bold">✓</div>
+                      </div>
+                      <div class="p-2 text-xs text-zinc-100 truncate" x-text="ref.name || 'Unnamed'"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <div x-show="pickerCompetitorRefs.length === 0 && pickerOwnRefs.length === 0" class="text-sm text-muted py-8 text-center">No references yet. Add some in the References section.</div>
+          </div>
+          <div class="px-6 py-4 border-t border-bg-border flex items-center justify-between">
+            <div class="text-sm text-muted" x-text="generateForm.referenceIds.length + ' selected'"></div>
+            <button class="btn btn-primary" @click="refPickerOpen = false">Done</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== AMAZON ===================== -->
+    <section x-show="view === 'amazon'">
+      <h1 class="text-2xl font-semibold text-zinc-100 mb-2">Amazon Listing</h1>
+      <p class="text-sm text-muted mb-6">The complete image stack for an Amazon Listing. Will be built next once the Online Shop is complete.</p>
+      <div class="card p-5 mb-6 flex items-start gap-3">
+        <span class="chip chip-accent flex-shrink-0">In Progress</span>
+        <p class="text-sm text-muted">Same pipeline as Ads and Online Shop — adapted for Amazon image types below.</p>
+      </div>
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Planned Image Types</h2>
+      <div class="grid grid-cols-2 gap-3">
+        <template x-for="tpl in amazonTemplates" :key="tpl.id">
+          <div class="card p-4 opacity-70">
+            <div class="text-sm font-medium text-zinc-100" x-text="tpl.label"></div>
+            <div class="text-xs text-muted mt-1" x-text="tpl.desc"></div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- ===================== DISCUSS ===================== -->
+    <section x-show="view === 'discuss'">
+      <h1 class="text-2xl font-semibold text-zinc-100 mb-2">Discuss</h1>
+      <p class="text-sm text-muted mb-6">Chat with Claude about concepts, hooks, reference analysis. Coming soon.</p>
+      <div class="card p-6 text-muted text-sm">Coming soon.</div>
+    </section>
+
+    <!-- ===================== BRAND KIT (inline, single) ===================== -->
+    <section x-show="view === 'brandKit'">
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="text-2xl font-semibold text-zinc-100">Brand Kit</h1>
+        <div class="flex items-center gap-2">
+          <template x-if="brandKit.logoImages && brandKit.logoImages.length">
+            <img :src="blobUrl(brandKit.logoImages[0].blob)" class="w-8 h-8 rounded object-cover bg-bg-elev">
+          </template>
+          <span class="text-sm text-muted">The Better Cat</span>
+        </div>
+      </div>
+      <p class="text-sm text-muted mb-6">Brand identity used as context in every generation. Changes apply immediately.</p>
+
+      <div class="max-w-3xl space-y-6">
+
+        <!-- IDENTITY -->
+        <div class="card p-6">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted mb-4">Identity</h3>
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="label">Brand Name</label>
+                <input class="input" x-model="brandKit.name">
+              </div>
+              <div>
+                <label class="label">Tagline</label>
+                <input class="input" x-model="brandKit.tagline">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="label">Logos</label>
+                <div class="dropzone py-2 px-3 flex items-center gap-2 mb-2"
+                  :class="{ dragover: dragState === 'bk-logo' }"
+                  @dragover.prevent="dragState='bk-logo'" @dragleave="dragState=null"
+                  @drop.prevent="bkHandleDrop($event,'logo');dragState=null"
+                  @click="$refs.bkLogoInput.click()">
+                  <span class="text-xs">+ Add logo (Drop / Click)</span>
+                  <input type="file" accept="image/*" multiple class="hidden" x-ref="bkLogoInput" @change="bkHandleFileInput($event,'logo')">
+                </div>
+                <div x-show="brandKit.logoImages && brandKit.logoImages.length" class="flex flex-wrap gap-2">
+                  <template x-for="(img, idx) in brandKit.logoImages" :key="img.id">
+                    <div class="relative group">
+                      <img :src="blobUrl(img.blob)" class="w-12 h-12 rounded object-contain bg-bg-elev border border-bg-border">
+                      <button class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center" @click="brandKit.logoImages.splice(idx,1)">✕</button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div>
+                <label class="label">Typography</label>
+                <input class="input" x-model="brandKit.typography">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FONTS -->
+        <div class="card p-6">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted mb-4">Fonts (Degural Display, Arbeit)</h3>
+          <div class="dropzone mb-3 py-3"
+            :class="{ dragover: dragState === 'bk-fonts' }"
+            @dragover.prevent="dragState='bk-fonts'" @dragleave="dragState=null"
+            @drop.prevent="bkHandleFontDrop($event);dragState=null"
+            @click="$refs.bkFontInput.click()">
+            <div class="text-sm">Drop font files or click</div>
+            <div class="text-xs mt-1">.ttf / .woff / .woff2 / .otf</div>
+            <input type="file" accept=".ttf,.woff,.woff2,.otf" multiple class="hidden" x-ref="bkFontInput" @change="bkHandleFontInput($event)">
+          </div>
+          <div x-show="brandKit.fontFiles && brandKit.fontFiles.length" class="space-y-2">
+            <template x-for="(ff, idx) in brandKit.fontFiles" :key="ff.id">
+              <div class="flex items-center gap-2">
+                <span class="chip chip-muted text-xs flex-shrink-0" x-text="ff.name"></span>
+                <input class="input text-xs flex-1" x-model="ff.label" placeholder="e.g. Degural Display Bold">
+                <button class="btn btn-ghost text-danger text-xs px-2" @click="brandKit.fontFiles.splice(idx,1)">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- COLORS -->
+        <div class="card p-6">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted mb-1">Brand Colors</h3>
+          <p class="text-xs text-muted mb-4">TBC Orange is the hero colour — always use it as the dominant anchor.</p>
+          <div class="grid grid-cols-2 gap-3">
+            <template x-for="[key, label] in [['orange','TBC Orange (Hero)'],['sky','TBC Sky'],['yellow','TBC Yellow'],['oat','TBC Oat'],['green','TBC Green'],['leaf','TBC Leaf'],['grain','TBC Grain'],['lilac','TBC Lilac'],['grey','TBC Grey'],['black','TBC Black']]" :key="key">
+              <div>
+                <label class="label" x-text="label"></label>
+                <div class="flex gap-2">
+                  <input type="color" class="w-10 h-9 rounded border border-bg-border bg-bg-elev cursor-pointer flex-shrink-0" :value="brandKit.colors[key]" @input="brandKit.colors[key] = $event.target.value">
+                  <input class="input font-mono text-xs" :value="brandKit.colors[key]" @input="brandKit.colors[key] = $event.target.value">
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- MASCOT -->
+        <div class="card p-6">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted mb-4">Mascot / Visual Element</h3>
+          <div class="space-y-3">
+            <textarea class="input" rows="3" x-model="brandKit.mascotDescription" placeholder="e.g. Sphynx cat mascot, bold graphic illustration style. Description helps even without images."></textarea>
+            <div class="dropzone py-2 px-3 flex items-center gap-2"
+              :class="{ dragover: dragState === 'bk-mascot' }"
+              @dragover.prevent="dragState='bk-mascot'" @dragleave="dragState=null"
+              @drop.prevent="bkHandleDrop($event,'mascot');dragState=null"
+              @click="$refs.bkMascotInput.click()">
+              <span class="text-xs">+ Add mascot image (Drop / Click)</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden" x-ref="bkMascotInput" @change="bkHandleFileInput($event,'mascot')">
+            </div>
+            <div x-show="brandKit.mascotImages && brandKit.mascotImages.length" class="flex flex-wrap gap-2">
+              <template x-for="(img, idx) in brandKit.mascotImages" :key="img.id">
+                <div class="relative group">
+                  <img :src="blobUrl(img.blob)" class="w-16 h-16 rounded object-contain bg-bg-elev border border-bg-border">
+                  <button class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center" @click="brandKit.mascotImages.splice(idx,1)">✕</button>
+                </div>
+              </template>
+            </div>
+            <div class="text-xs text-muted" x-show="brandKit.mascotImages && brandKit.mascotImages.length">All mascot images are sent as visual references to keep the mascot consistent across generations.</div>
+          </div>
+        </div>
+
+        <!-- MARKDOWN DESCRIPTION -->
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted">Brand Description (Markdown)</h3>
+            <button class="text-xs text-accent hover:underline" @click="$refs.bkMdInput.click()">+ Load .md file</button>
+            <input type="file" accept=".md,.markdown,text/plain" class="hidden" x-ref="bkMdInput" @change="bkHandleMarkdown($event)">
+          </div>
+          <textarea class="input font-mono text-xs" rows="6" x-model="brandKit.description" placeholder="Optional: Markdown notes about the brand. Used as additional context in prompts (max 1500 chars injected)."></textarea>
+        </div>
+
+        <!-- TONE + ANGLES + DO/DONT + COPY -->
+        <div class="card p-6 space-y-5">
+          <div>
+            <label class="label">Tone Adjectives (comma-separated)</label>
+            <input class="input" :value="(brandKit.toneAdjectives||[]).join(', ')" @input="brandKit.toneAdjectives=$event.target.value.split(',').map(s=>s.trim()).filter(Boolean)">
+            <div class="flex flex-wrap gap-1 mt-2" x-show="brandKit.toneAdjectives?.length">
+              <template x-for="adj in brandKit.toneAdjectives" :key="adj">
+                <span class="chip chip-accent" x-text="adj"></span>
+              </template>
+            </div>
+          </div>
+          <div>
+            <label class="label">Campaign Angles (one per line)</label>
+            <textarea class="input" rows="6" :value="(brandKit.angles||[]).join('\n')" @input="brandKit.angles=$event.target.value.split('\n').map(s=>s.trim()).filter(Boolean)"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="label text-success">Do's (one per line)</label>
+              <textarea class="input" rows="6" :value="(brandKit.doExamples||[]).join('\n')" @input="brandKit.doExamples=$event.target.value.split('\n').map(s=>s.trim()).filter(Boolean)"></textarea>
+            </div>
+            <div>
+              <label class="label text-danger">Don'ts (one per line)</label>
+              <textarea class="input" rows="6" :value="(brandKit.dontExamples||[]).join('\n')" @input="brandKit.dontExamples=$event.target.value.split('\n').map(s=>s.trim()).filter(Boolean)"></textarea>
+            </div>
+          </div>
+          <div>
+            <label class="label">Copy Examples (one per line)</label>
+            <textarea class="input" rows="5" :value="(brandKit.germanCopyExamples||[]).join('\n')" @input="brandKit.germanCopyExamples=$event.target.value.split('\n').map(s=>s.trim()).filter(Boolean)"></textarea>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================== PRODUCTS ===================== -->
+    <section x-show="view === 'products'">
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="text-2xl font-semibold text-zinc-100">Products</h1>
+        <button class="btn btn-primary" @click="openProductModal()">+ Add Product</button>
+      </div>
+      <p class="text-sm text-muted mb-6">Product catalog used in generation. Select products in the Generate panel.</p>
+      <div x-show="products.length === 0" class="card p-12 text-center">
+        <p class="text-muted mb-4">No products yet.</p>
+        <button class="btn btn-primary" @click="openProductModal()">Add first product</button>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <template x-for="prod in products" :key="prod.id">
+          <div class="card overflow-hidden cursor-pointer hover:border-accent transition" @click="openProductModal(prod)">
+            <div class="aspect-video bg-bg-elev">
+              <template x-if="prod.images && prod.images.length">
+                <img :src="blobUrl(prod.images[0].blob)" class="w-full h-full object-cover">
+              </template>
+              <template x-if="!prod.images || !prod.images.length">
+                <div class="w-full h-full flex items-center justify-center text-muted text-xs">No image</div>
+              </template>
+            </div>
+            <div class="p-3">
+              <div class="font-medium text-zinc-100 truncate" x-text="prod.title"></div>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="chip chip-muted text-xs" x-text="prod.category"></span>
+                <span x-show="prod.flavor" class="text-xs text-muted" x-text="prod.flavor"></span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- PRODUCT MODAL -->
+    <div x-show="productModal.open" x-transition.opacity class="fixed inset-0 z-40 modal-bg flex items-start justify-center overflow-y-auto py-8" @click.self="closeProductModal()">
+      <div class="card w-full max-w-2xl mx-4 my-auto" @click.stop>
+        <div class="px-6 py-4 border-b border-bg-border flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-zinc-100" x-text="productModal.editing ? 'Edit Product' : 'New Product'"></h2>
+          <button class="btn btn-ghost p-1" @click="closeProductModal()">✕</button>
+        </div>
+        <div class="p-6 space-y-4" x-show="productModal.product">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="label">Title *</label>
+              <input class="input" x-model="productModal.product.title" placeholder="e.g. Lachs Adult 400g">
+            </div>
+            <div>
+              <label class="label">Category *</label>
+              <select class="input" x-model="productModal.product.category">
+                <option value="">— select —</option>
+                <option>Dry Food</option>
+                <option>Wet Food</option>
+                <option>Snacks &amp; Treats</option>
+                <option>Supplements</option>
+                <option>Bundle</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="label">Flavor (optional)</label>
+              <input class="input" x-model="productModal.product.flavor" placeholder="e.g. Lachs, Huhn &amp; Rind">
+            </div>
+            <div>
+              <label class="label">Age Range (optional)</label>
+              <input class="input" x-model="productModal.product.ageRange" placeholder="e.g. Adult, Kitten">
+            </div>
+          </div>
+          <!-- Product images -->
+          <div>
+            <label class="label">Product Images *</label>
+            <div class="dropzone mb-3 py-3"
+              :class="{ dragover: dragState === 'prod-img' }"
+              @dragover.prevent="dragState='prod-img'" @dragleave="dragState=null"
+              @drop.prevent="prodHandleImgDrop($event);dragState=null"
+              @click="$refs.prodImgInput.click()">
+              <div class="text-sm">Drag images here or click</div>
+              <div class="text-xs mt-1">PNG / JPG — multiple allowed</div>
+              <input type="file" accept="image/*" multiple class="hidden" x-ref="prodImgInput" @change="prodHandleImgInput($event)">
+            </div>
+            <div x-show="productModal.product.images && productModal.product.images.length" class="grid grid-cols-5 gap-2">
+              <template x-for="(img, idx) in productModal.product.images" :key="img.id">
+                <div class="relative group">
+                  <img :src="blobUrl(img.blob)" class="w-full aspect-square rounded object-cover bg-bg-elev">
+                  <button class="absolute top-1 right-1 w-5 h-5 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition" @click="productModal.product.images.splice(idx,1)">✕</button>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div>
+            <label class="label">Description (optional)</label>
+            <textarea class="input" rows="2" x-model="productModal.product.description"></textarea>
+          </div>
+          <div>
+            <label class="label">Nutrition Notes (optional)</label>
+            <textarea class="input" rows="2" x-model="productModal.product.nutritionNotes" placeholder="e.g. 65% fresh meat, grain-free"></textarea>
+          </div>
+          <div>
+            <label class="label">Key Ingredients (one per line, optional)</label>
+            <textarea class="input" rows="3"
+              :value="(productModal.product.keyIngredients||[]).join('\n')"
+              @input="productModal.product.keyIngredients=$event.target.value.split('\n').map(s=>s.trim()).filter(Boolean)"
+              placeholder="e.g. Salmon&#10;Sweet Potato&#10;Taurine"></textarea>
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-bg-border flex items-center justify-between">
+          <button x-show="productModal.editing" class="btn btn-ghost text-danger" @click="deleteProduct()">Delete</button>
+          <div class="flex gap-2 ml-auto">
+            <button class="btn btn-secondary" @click="closeProductModal()">Cancel</button>
+            <button class="btn btn-primary" @click="saveProduct()" :disabled="!productModal.product?.title || !productModal.product?.category || !productModal.product?.images?.length">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== REFERENCES ===================== -->
+    <section x-show="view === 'references'">
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="text-2xl font-semibold text-zinc-100">References</h1>
+        <button class="btn btn-primary" @click="openReferenceModal()">+ Add Reference</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 mb-5 p-1 bg-bg-card rounded-lg w-fit border border-bg-border">
+        <button class="px-4 py-1.5 rounded text-sm font-medium transition"
+          :class="refTab==='competitor' ? 'bg-accent text-bg' : 'text-muted hover:text-zinc-100'"
+          @click="refTab='competitor'">Competitors</button>
+        <button class="px-4 py-1.5 rounded text-sm font-medium transition"
+          :class="refTab==='own' ? 'bg-accent text-bg' : 'text-muted hover:text-zinc-100'"
+          @click="refTab='own'">Own Ads</button>
+      </div>
+
+      <!-- Bulk drop -->
+      <div class="dropzone mb-6" :class="{ dragover: dragState === 'bulkRefs' }"
+        @dragover.prevent="dragState='bulkRefs'" @dragleave="dragState=null"
+        @drop.prevent="handleBulkRefDrop($event);dragState=null">
+        <div class="text-sm">Drag images here for bulk import</div>
+        <div class="text-xs mt-1">Added to active tab. Set tags afterwards.</div>
+      </div>
+
+      <!-- Tag filter -->
+      <div x-show="allTags.length" class="flex flex-wrap gap-2 mb-4">
+        <button class="chip" :class="filterTag===null ? 'chip-accent' : 'chip-muted'" @click="filterTag=null">All</button>
+        <template x-for="tag in allTags" :key="tag">
+          <button class="chip" :class="filterTag===tag ? 'chip-accent' : 'chip-muted'" @click="filterTag=filterTag===tag?null:tag" x-text="tag"></button>
+        </template>
+      </div>
+
+      <div x-show="filteredReferences.length === 0" class="card p-12 text-center">
+        <p class="text-muted" x-text="refTab==='own' ? 'No own ads yet. Add your best-performing TBC creatives.' : 'No competitor references yet. Drag competitor images above.'"></p>
+      </div>
+
+      <div class="grid grid-cols-4 gap-3">
+        <template x-for="ref in filteredReferences" :key="ref.id">
+          <div class="card overflow-hidden cursor-pointer hover:border-accent transition" @click="openReferenceModal(ref)">
+            <div class="aspect-square bg-bg-elev">
+              <img :src="blobUrl(ref.imageBlob)" class="w-full h-full object-cover">
+            </div>
+            <div class="p-3">
+              <div class="text-sm font-medium text-zinc-100 truncate" x-text="ref.name || 'Unnamed'"></div>
+              <div class="flex flex-wrap gap-1 mt-1" x-show="ref.tags?.length">
+                <template x-for="tag in (ref.tags||[]).slice(0,3)" :key="tag">
+                  <span class="chip chip-muted text-xs" x-text="tag"></span>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- REFERENCE MODAL -->
+    <div x-show="referenceModal.open" x-transition.opacity class="fixed inset-0 z-40 modal-bg flex items-start justify-center overflow-y-auto py-8" @click.self="closeReferenceModal()">
+      <div class="card w-full max-w-2xl mx-4 my-auto" @click.stop>
+        <div class="px-6 py-4 border-b border-bg-border flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-zinc-100"
+            x-text="referenceModal.editing ? (referenceModal.source==='own' ? 'Edit Own Ad' : 'Edit Reference') : (referenceModal.source==='own' ? 'New Own Ad' : 'New Reference')"></h2>
+          <button class="btn btn-ghost p-1" @click="closeReferenceModal()">✕</button>
+        </div>
+        <div class="p-6 space-y-4" x-show="referenceModal.ref">
+          <div>
+            <label class="label">Image *</label>
+            <template x-if="referenceModal.ref?.imageBlob">
+              <div class="relative">
+                <img :src="blobUrl(referenceModal.ref.imageBlob)" class="w-full max-h-72 object-contain rounded bg-bg-elev">
+                <button class="absolute top-2 right-2 btn btn-secondary text-xs" @click="referenceModal.ref.imageBlob=null">Replace</button>
+              </div>
+            </template>
+            <template x-if="!referenceModal.ref?.imageBlob">
+              <div class="dropzone" :class="{ dragover: dragState==='refImage' }"
+                @dragover.prevent="dragState='refImage'" @dragleave="dragState=null"
+                @drop.prevent="handleRefImageDrop($event);dragState=null"
+                @click="$refs.refImageInput.click()">
+                <div class="text-sm">Drop image here or click</div>
+                <input type="file" accept="image/*" class="hidden" x-ref="refImageInput" @change="handleRefImageInput($event)">
+              </div>
+            </template>
+          </div>
+          <div>
+            <label class="label">Name</label>
+            <input class="input" x-model="referenceModal.ref.name" placeholder="e.g. Competitor Sale Ad">
+          </div>
+          <div>
+            <label class="label">Tags (comma-separated)</label>
+            <input class="input" :value="(referenceModal.ref.tags||[]).join(', ')" @input="referenceModal.ref.tags=$event.target.value.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean)" placeholder="e.g. sale, lifestyle, supplement">
+            <div class="flex flex-wrap gap-1 mt-2" x-show="referenceModal.ref.tags?.length">
+              <template x-for="tag in referenceModal.ref.tags" :key="tag">
+                <span class="chip chip-accent" x-text="tag"></span>
+              </template>
+            </div>
+          </div>
+          <div>
+            <label class="label">Extracted Principle</label>
+            <textarea class="input" rows="2" x-model="referenceModal.ref.extractedPrinciple" placeholder="e.g. Sale-driven composite with discount headline + hero + price badge"></textarea>
+          </div>
+          <div>
+            <label class="label">Notes (optional)</label>
+            <textarea class="input" rows="2" x-model="referenceModal.ref.notes"></textarea>
+          </div>
+          <div>
+            <label class="label">Source / URL (optional)</label>
+            <input class="input" x-model="referenceModal.ref.sourceUrl" placeholder="https://facebook.com/ads/library/...">
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-bg-border flex items-center justify-between">
+          <button x-show="referenceModal.editing" class="btn btn-ghost text-danger" @click="deleteReference()">Delete</button>
+          <div class="flex gap-2 ml-auto">
+            <button class="btn btn-secondary" @click="closeReferenceModal()">Cancel</button>
+            <button class="btn btn-primary" @click="saveReference()" :disabled="!referenceModal.ref?.imageBlob">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== HISTORY ===================== -->
+    <section x-show="view === 'history'">
+      <h1 class="text-2xl font-semibold text-zinc-100 mb-2">History</h1>
+      <p class="text-sm text-muted mb-6">Will be built after step 4.</p>
+      <div class="card p-6 text-muted text-sm">Coming soon.</div>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section x-show="view === 'settings'">
+      <h1 class="text-2xl font-semibold text-zinc-100 mb-2">Settings</h1>
+      <p class="text-sm text-muted mb-6">Image backend, API keys and generation defaults.</p>
+
+      <!-- IMAGE BACKEND -->
+      <div class="card p-6 mb-6">
+        <h2 class="text-base font-semibold text-zinc-100 mb-1">Image Generation</h2>
+        <p class="text-xs text-muted mb-4">Choose which backend generates images.</p>
+        <div class="flex gap-2 mb-5">
+          <button class="btn flex-1 justify-center"
+            :class="settings.imageBackend !== 'google' ? 'btn-primary' : 'btn-secondary'"
+            @click="settings.imageBackend='higgsfield'; saveSettings()">
+            Higgsfield
+          </button>
+          <button class="btn flex-1 justify-center"
+            :class="settings.imageBackend === 'google' ? 'btn-primary' : 'btn-secondary'"
+            @click="settings.imageBackend='google'; saveSettings()">
+            Google Gemini
+          </button>
+        </div>
+
+        <!-- Higgsfield OAuth -->
+        <div x-show="settings.imageBackend !== 'google'">
+          <h3 class="text-sm font-semibold text-zinc-100 mb-3">Higgsfield Account</h3>
+          <template x-if="!auth.accessToken">
+            <div>
+              <button class="btn btn-primary" @click="startLogin()" :disabled="loggingIn">
+                <span x-show="!loggingIn">Sign in with Higgsfield</span>
+                <span x-show="loggingIn">Connecting…</span>
+              </button>
+              <div class="text-xs text-muted mt-3">On first click the app registers with Higgsfield, then you're redirected to log in. Afterwards you land back here.</div>
+              <div x-show="!isHttp" class="mt-3 text-xs text-danger">
+                ⚠ App running via <code x-text="locationOrigin"></code>. Higgsfield login requires http:// or https://. Use <code>start.command</code>.
+              </div>
+            </div>
+          </template>
+          <template x-if="auth.accessToken">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm text-zinc-100" x-text="auth.userInfo?.email || auth.userInfo?.name || 'Logged in'"></div>
+                <div class="text-xs text-muted" x-text="tokenExpiryInfo()"></div>
+              </div>
+              <button class="btn btn-secondary" @click="logout()">Sign out</button>
+            </div>
+          </template>
+        </div>
+
+        <!-- Google Gemini -->
+        <div x-show="settings.imageBackend === 'google'" class="space-y-3">
+          <div>
+            <label class="label">Google API Key</label>
+            <input :type="showSecrets ? 'text' : 'password'" class="input font-mono" x-model="settings.googleApiKey" placeholder="AIza..." @blur="saveSettings()">
+          </div>
+          <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+            <input type="checkbox" x-model="showSecrets" class="rounded">
+            <span>Show key in plaintext</span>
+          </label>
+          <div class="text-xs text-muted p-3 bg-bg-elev rounded-lg">
+            Generates via Gemini 2.0 Flash. No polling needed — response is synchronous. References act as style inspiration only (no layout transfer).
+          </div>
+        </div>
+      </div>
+
+      <!-- LEGACY API KEYS -->
+      <details class="card p-6 mb-6" x-show="settings.imageBackend !== 'google'">
+        <summary class="text-base font-semibold text-zinc-100 cursor-pointer">Legacy API Key Method (Fallback)</summary>
+        <p class="text-xs text-muted mb-4 mt-2">Only needed if MCP OAuth flow doesn't work.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="label">Higgsfield Key ID</label>
+            <input type="text" class="input font-mono" x-model="settings.higgsfieldKeyId" placeholder="optional" @blur="saveSettings()">
+          </div>
+          <div>
+            <label class="label">Higgsfield Key Secret</label>
+            <input :type="showSecrets ? 'text' : 'password'" class="input font-mono" x-model="settings.higgsfieldKeySecret" placeholder="optional" @blur="saveSettings()">
+          </div>
+          <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
+            <input type="checkbox" x-model="showSecrets" class="rounded">
+            <span>Show keys in plaintext</span>
+          </label>
+        </div>
+      </details>
+
+      <!-- DEFAULTS -->
+      <div class="card p-6 mb-6">
+        <h2 class="text-base font-semibold text-zinc-100 mb-1">Defaults</h2>
+        <p class="text-xs text-muted mb-4">Default values for new generations.</p>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="label">Default Model</label>
+            <select class="input" x-model="settings.defaultModel" @change="saveSettings()">
+              <template x-for="[key] in Object.entries(settings.modelEndpoints||{})" :key="key">
+                <option :value="key" :selected="key===settings.defaultModel" x-text="key"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="label">Default Format</label>
+            <select class="input" x-model="settings.defaultAspect" @change="saveSettings()">
+              <option value="1:1">1:1 (Meta Feed)</option>
+              <option value="4:5">4:5 (Feed Portrait)</option>
+              <option value="9:16">9:16 (Story/Reel)</option>
+              <option value="16:9">16:9 (YouTube)</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">Default Quality</label>
+            <select class="input" x-model="settings.defaultQuality" @change="saveSettings()">
+              <option value="">auto</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODEL ENDPOINTS -->
+      <div class="card p-6 mb-6">
+        <h2 class="text-base font-semibold text-zinc-100 mb-1">Model Endpoints</h2>
+        <p class="text-xs text-muted mb-4">MCP model IDs for <code class="text-zinc-400">generate_image</code>. If "Model not found" errors occur, check via <code class="text-zinc-400">models_explore</code>.</p>
+        <div class="space-y-2">
+          <template x-for="[key, ep] in Object.entries(settings.modelEndpoints||{})" :key="key">
+            <div class="flex gap-2 items-center">
+              <input class="input flex-shrink-0 w-44 font-mono text-xs" :value="key" @blur="renameModelKey(key,$event.target.value)">
+              <input class="input flex-1 font-mono text-xs" :value="ep" @blur="settings.modelEndpoints[key]=$event.target.value;saveSettings()">
+              <button class="btn btn-ghost text-danger px-2 py-1" @click="delete settings.modelEndpoints[key];saveSettings()" title="Delete">✕</button>
+            </div>
+          </template>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button class="btn btn-secondary text-xs" @click="addModelEndpoint()">+ Add Model</button>
+          <button class="btn btn-ghost text-xs" @click="resetModelEndpoints()">Restore Defaults</button>
+        </div>
+        <div class="mt-4">
+          <label class="label">Image Input Field Name</label>
+          <input class="input font-mono text-xs" x-model="settings.imageInputField" @blur="saveSettings()" placeholder="image_inputs">
+          <div class="text-xs text-muted mt-1">Some models use <code>image_inputs</code>, others <code>input_images</code>. Adjust if you see "Bad Request".</div>
+        </div>
+      </div>
+
+      <!-- ABOUT -->
+      <div class="card p-6">
+        <h2 class="text-base font-semibold text-zinc-100 mb-1">About</h2>
+        <p class="text-xs text-muted">Pablo · The Better Cat Ad Generator · Single-HTML app · Session-based state · Railway-deployable. Uses Higgsfield or Google Gemini (image generation) and Anthropic (chat).</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div x-show="toast.show" x-transition class="toast" :class="toast.type==='error' ? 'toast-error' : 'toast-success'">
+  <span x-text="toast.message"></span>
+</div>
+
+<script>
+// ============================================================
+// ICONS
+// ============================================================
+const icons = {
+  zap:     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  message: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  palette: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
+  library: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>',
+  history: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>',
+  settings:'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+  shop:    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+  box:     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>',
+  layers:  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+};
+
+// ============================================================
+// ALPINE APP
+// ============================================================
+function app() {
+  return {
+    view: 'ads',
+    showSecrets: false,
+    toast: { show: false, message: '', type: 'success' },
+    dragState: null,
+    blobUrlCache: new Map(),
+    refTab: 'competitor',
+
+    // ---- State: references, products ----
+    references: [],
+    ownReferences: [],
+    products: [],
+
+    // ---- Single Brand Kit ----
+    brandKit: {
+      name: 'The Better Cat',
+      tagline: 'Craft Cat Food.',
+      description: '',
+      logoImages: [],
+      mascotImages: [],
+      mascotDescription: '',
+      fontFiles: [],
+      colors: {
+        sky:    '#18044D',
+        yellow: '#FFE026',
+        green:  '#3A663D',
+        leaf:   '#A6CC99',
+        grey:   '#E9E9E9',
+        lilac:  '#E5D6EB',
+        oat:    '#FCF6E0',
+        grain:  '#FAE2BE',
+        orange: '#FA7B3C',
+        black:  '#000000',
+      },
+      typography: 'Degural Display (headlines), Arbeit (body)',
+      toneAdjectives: ['energetic', 'playful', 'rebellious', 'reliably friendly', 'innovative', 'bold'],
+      doExamples: [
+        'Sphynx mascot with strong expression — tongue out, winking, mid-yell, attitude',
+        'Bold full-bleed colour backgrounds (TBC Sky, TBC Yellow, TBC Orange)',
+        'Large confident left-aligned Degural Display headlines',
+        'Real cat parents — joyful, warm, interacting with cats',
+        'Cats with character and expression — surprised, cheeky, in motion',
+        'TBC Orange as dominant hero colour, max 4 brand colours per layout',
+        'Clean graphic cut-out style for cat photography',
+        'Strong contrast between subject and background',
+        'Product percentage callouts in circular badge format',
+        'Keep copy short — 1-2 lines max for brand statements',
+      ],
+      dontExamples: [
+        'Generic, passive, emotionless stock imagery',
+        'Dark, moody, or desaturated imagery',
+        'Sad or unhappy cats',
+        'Using all 10 palette colours in one layout',
+        'Right-aligned brand statements or headlines',
+        'Drop shadows, outlines, or gradient effects on type',
+        'Busy cluttered scenes without clear visual focus',
+        'Low-contrast image + logo combinations',
+        'Unapproved colour combinations for the wordmark',
+        'Corporate, passive, or overly formal language',
+      ],
+      germanCopyExamples: [
+        'Craft Cat Food.',
+        'Food they deserve.',
+        'Cat Nutrition Defined.',
+        'Picky Cat Approved.',
+        'Healthy digestion, shiny fur.',
+        'Feed them the food they deserve.',
+        'Proudly created with ❤ by cat parents.',
+        'Developed in Germany. Produced in the EU.',
+      ],
+      angles: [
+        'Species-specific nutrition (cats only)',
+        'Premium natural ingredients',
+        'Picky cat approved',
+        'Healthy digestion & shiny fur',
+        'No nasty additives',
+        'Made in EU / Developed in Germany',
+        'Real cat parent testimonial',
+        'vs. generic supermarket food',
+        'Rebellious challenger brand',
+        'Vet / expert backed',
+        'New product launch',
+        'Limited edition / seasonal',
+      ],
+    },
+
+    // ---- Modals ----
+    referenceModal: { open: false, editing: false, source: 'competitor', ref: null },
+    productModal: { open: false, editing: false, product: null },
+
+    filterTag: null,
+    refPickerOpen: false,
+
+    // ---- Generate form ----
+    generateForm: {
+      productIds: [],
+      referenceIds: [],
+      shopTemplateIds: [],
+      angle: '',
+      mode: 'per-ref',
+      aspect: '1:1',
+      model: 'gpt_image_2',
+      quality: 'high',
+      resolution: '4k',
+      count: 1,
+      customPrompt: '',
+      sendImages: true,
+    },
+
+    shopTemplates: [
+      { id: 'hero',      label: 'Hero / Banner',            aspect: '16:9', desc: 'Wide hero banner, product prominent, space for a headline.' },
+      { id: 'lifestyle', label: 'Lifestyle / In-Use',       aspect: '4:5',  desc: 'Product in real use, warm scene, cat/owner.' },
+      { id: 'benefit',   label: 'Benefit / Feature Graphic',aspect: '1:1',  desc: 'Product with benefit highlights, icons and short text.' },
+      { id: 'clean',     label: 'Clean Product & Detail',   aspect: '1:1',  desc: 'Isolated on white, macro/texture, ingredients.' },
+    ],
+
+    amazonTemplates: [
+      { id: 'main',       label: 'Main Image (white background)', desc: 'Product isolated on pure white. Amazon requirement: no text.' },
+      { id: 'infographic',label: 'Infographic / Benefits',        desc: 'Benefits with icons and short text around the product.' },
+      { id: 'lifestyle',  label: 'Lifestyle / In-Use',            desc: 'Product in real use, with cat/owner.' },
+      { id: 'comparison', label: 'Comparison / Feature',          desc: 'Why this product: properties compared side by side.' },
+      { id: 'contents',   label: 'Contents / Scope of Delivery',  desc: "What's included / how many units." },
+      { id: 'usage',      label: 'Usage / Dosage',                desc: 'How the product is used.' },
+    ],
+
+    get genType() { return this.view === 'shop' ? 'shop' : 'ads'; },
+    get isGenerateView() { return this.view === 'ads' || this.view === 'shop'; },
+
+    generating: false,
+    currentStep: '',
+    abortRequested: false,
+    currentRun: null,
+
+    get selectedProducts() {
+      return this.generateForm.productIds
+        .map(id => this.products.find(p => p.id === id))
+        .filter(Boolean);
+    },
+
+    referenceById(id) {
+      return [...this.references, ...this.ownReferences].find(r => r.id == id) || null;
+    },
+
+    toggleProductId(id) {
+      const i = this.generateForm.productIds.indexOf(id);
+      if (i >= 0) this.generateForm.productIds.splice(i, 1);
+      else this.generateForm.productIds.push(id);
+    },
+
+    toggleRefSelect(id) {
+      const i = this.generateForm.referenceIds.indexOf(id);
+      if (i >= 0) this.generateForm.referenceIds.splice(i, 1);
+      else this.generateForm.referenceIds.push(id);
+    },
+
+    toggleShopTemplate(id) {
+      const i = this.generateForm.shopTemplateIds.indexOf(id);
+      if (i >= 0) this.generateForm.shopTemplateIds.splice(i, 1);
+      else this.generateForm.shopTemplateIds.push(id);
+    },
+
+    canGenerate() {
+      const f = this.generateForm;
+      if (f.productIds.length === 0) return false;
+      if (this.genType === 'shop' && f.shopTemplateIds.length === 0) return false;
+      if (this.settings.imageBackend === 'google') return !!this.settings.googleApiKey;
+      return !!(this.auth.accessToken || (this.settings.higgsfieldKeyId && this.settings.higgsfieldKeySecret));
+    },
+
+    plannedCount() {
+      const f = this.generateForm;
+      if (this.genType === 'shop') {
+        if (f.shopTemplateIds.length > 1) return f.shopTemplateIds.length;
+        return f.count || 1;
+      }
+      if (f.referenceIds.length > 1 && f.mode === 'per-ref') return f.referenceIds.length;
+      return f.count || 1;
+    },
+
+    get allTags() {
+      const set = new Set();
+      for (const r of [...this.references, ...this.ownReferences]) (r.tags || []).forEach(t => set.add(t));
+      return Array.from(set).sort();
+    },
+
+    get filteredReferences() {
+      const arr = this.refTab === 'own' ? this.ownReferences : this.references;
+      if (!this.filterTag) return arr;
+      return arr.filter(r => (r.tags || []).includes(this.filterTag));
+    },
+
+    get pickerCompetitorRefs() {
+      if (!this.filterTag) return this.references;
+      return this.references.filter(r => (r.tags || []).includes(this.filterTag));
+    },
+
+    get pickerOwnRefs() {
+      if (!this.filterTag) return this.ownReferences;
+      return this.ownReferences.filter(r => (r.tags || []).includes(this.filterTag));
+    },
+
+    // ---- Auth ----
+    auth: { clientId: '', accessToken: '', refreshToken: '', tokenExpiresAt: 0, userInfo: null },
+    loggingIn: false,
+
+    OAUTH_AUTHZ: 'https://mcp.higgsfield.ai/oauth2/authorize',
+    OAUTH_TOKEN: '/api/oauth2/token',
+    OAUTH_REGISTER: '/api/oauth2/register',
+    OAUTH_SCOPES: 'openid email offline_access',
+
+    get isHttp() { return window.location.protocol !== 'file:'; },
+    get locationOrigin() { return window.location.protocol + '//' + window.location.host; },
+
+    // ---- Settings ----
+    settings: {
+      imageBackend: 'higgsfield',
+      googleApiKey: '',
+      higgsfieldKeyId: '',
+      higgsfieldKeySecret: '',
+      anthropicKey: '',
+      defaultModel: 'gpt_image_2',
+      defaultAspect: '1:1',
+      defaultQuality: 'high',
+      defaultResolution: '4k',
+      modelEndpoints: {
+        soul_2: 'soul_2', nano_banana_pro: 'nano_banana_pro', gpt_image_2: 'gpt_image_2',
+        nano_banana: 'nano_banana', nano_banana_2: 'nano_banana_2',
+        marketing_studio_image: 'marketing_studio_image', flux_2: 'flux_2', flux_kontext: 'flux_kontext',
+      },
+      imageInputField: 'image_inputs',
+    },
+
+    nav: [
+      { id: 'ads',       label: 'Ads',           icon: icons.zap },
+      { id: 'shop',      label: 'Online Shop',    icon: icons.shop },
+      { id: 'amazon',    label: 'Amazon Listing', icon: icons.box },
+      { id: 'discuss',   label: 'Discuss',        icon: icons.message },
+      { divider: true,   id: 'div1' },
+      { id: 'brandKit',  label: 'Brand Kit',      icon: icons.palette },
+      { id: 'products',  label: 'Products',       icon: icons.layers },
+      { id: 'references',label: 'References',     icon: icons.library },
+      { divider: true,   id: 'div2' },
+      { id: 'history',   label: 'History',        icon: icons.history },
+      { id: 'settings',  label: 'Settings',       icon: icons.settings },
+    ],
+
+    // ---- Init ----
+    async init() {
+      this.loadSettings();
+      this.loadAuth();
+      if (window.location.search.includes('code=')) await this.handleOAuthCallback();
+
+      const MIGRATION_VERSION = 6;
+      if ((this.settings.migrationVersion || 0) < MIGRATION_VERSION) {
+        this.settings.defaultModel = 'gpt_image_2';
+        this.settings.defaultAspect = '1:1';
+        this.settings.defaultQuality = 'high';
+        this.settings.defaultResolution = '4k';
+        if (!this.settings.imageBackend) this.settings.imageBackend = 'higgsfield';
+        this.resetModelEndpointsToDefaults();
+        this.settings.migrationVersion = MIGRATION_VERSION;
+        localStorage.setItem('adgen.settings', JSON.stringify(this.settings));
+      }
+      if (!this.settings.modelEndpoints || !Object.keys(this.settings.modelEndpoints).length) this.resetModelEndpointsToDefaults();
+      const validKeys = Object.keys(this.settings.modelEndpoints);
+      if (!validKeys.includes(this.settings.defaultModel)) {
+        this.settings.defaultModel = validKeys.includes('gpt_image_2') ? 'gpt_image_2' : validKeys[0];
+        localStorage.setItem('adgen.settings', JSON.stringify(this.settings));
+      }
+      this.generateForm.model   = this.settings.defaultModel;
+      this.generateForm.aspect  = this.settings.defaultAspect  || '1:1';
+      this.generateForm.quality = this.settings.defaultQuality || 'high';
+      this.generateForm.resolution = this.settings.defaultResolution || '4k';
+
+      const backendOk = this.settings.imageBackend === 'google'
+        ? !!this.settings.googleApiKey
+        : !!(this.auth.accessToken || (this.settings.higgsfieldKeyId && this.settings.higgsfieldKeySecret));
+      if (!backendOk) {
+        this.view = 'settings';
+        this.notify('Configure your image generation backend in Settings.', 'error');
+      }
+    },
+
+    resetModelEndpointsToDefaults() {
+      this.settings.modelEndpoints = {
+        soul_2: 'soul_2', nano_banana_pro: 'nano_banana_pro', gpt_image_2: 'gpt_image_2',
+        nano_banana: 'nano_banana', nano_banana_2: 'nano_banana_2',
+        marketing_studio_image: 'marketing_studio_image', flux_2: 'flux_2', flux_kontext: 'flux_kontext',
+      };
+      localStorage.setItem('adgen.settings', JSON.stringify(this.settings));
+    },
+
+    loadSettings() {
+      const raw = localStorage.getItem('adgen.settings');
+      if (raw) { try { Object.assign(this.settings, JSON.parse(raw)); } catch(e) {} }
+    },
+
+    saveSettings() {
+      localStorage.setItem('adgen.settings', JSON.stringify(this.settings));
+      this.notify('Settings saved.');
+    },
+
+    loadAuth() {
+      const raw = localStorage.getItem('adgen.auth');
+      if (raw) { try { Object.assign(this.auth, JSON.parse(raw)); } catch(e) {} }
+    },
+
+    saveAuth() { localStorage.setItem('adgen.auth', JSON.stringify(this.auth)); },
+
+    // ---- OAuth ----
+    base64url(bytes) {
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    },
+
+    async pkce() {
+      const verifier = this.base64url(crypto.getRandomValues(new Uint8Array(32)));
+      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+      return { verifier, challenge: this.base64url(new Uint8Array(hash)) };
+    },
+
+    tokenExpiryInfo() {
+      if (!this.auth.tokenExpiresAt) return 'Token active';
+      const ms = this.auth.tokenExpiresAt - Date.now();
+      if (ms <= 0) return 'Token expired';
+      const mins = Math.floor(ms / 60000);
+      return mins < 60 ? `Token valid for ${mins} min` : `Token valid for ${Math.floor(mins/60)} h`;
+    },
+
+    async startLogin() {
+      if (!this.isHttp) { this.notify('App must run via http:// or https://. Use start.command.', 'error'); return; }
+      this.loggingIn = true;
+      try {
+        const redirectUri = window.location.origin + window.location.pathname;
+        if (!this.auth.clientId) {
+          const r = await fetch(this.OAUTH_REGISTER, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_name: 'Pablo (The Better Cat · Cleverbrands Team)',
+              redirect_uris: [redirectUri], grant_types: ['authorization_code','refresh_token'],
+              response_types: ['code'], token_endpoint_auth_method: 'none', scope: this.OAUTH_SCOPES,
+            }),
+          });
+          if (!r.ok) throw new Error(`DCR ${r.status}: ${(await r.text()).slice(0,200)}`);
+          const data = await r.json();
+          this.auth.clientId = data.client_id;
+          this.saveAuth();
+        }
+        const { verifier, challenge } = await this.pkce();
+        const state = this.base64url(crypto.getRandomValues(new Uint8Array(16)));
+        sessionStorage.setItem('adgen.pkce_verifier', verifier);
+        sessionStorage.setItem('adgen.oauth_state', state);
+        const params = new URLSearchParams({ response_type:'code', client_id:this.auth.clientId,
+          redirect_uri:redirectUri, scope:this.OAUTH_SCOPES,
+          code_challenge:challenge, code_challenge_method:'S256', state });
+        window.location.href = `${this.OAUTH_AUTHZ}?${params}`;
+      } catch(e) {
+        this.notify('Login start failed: ' + e.message, 'error');
+        this.loggingIn = false;
+      }
+    },
+
+    async handleOAuthCallback() {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
+      const err = url.searchParams.get('error');
+      if (err) {
+        this.notify('OAuth error: ' + err, 'error');
+        history.replaceState({}, '', window.location.pathname);
+        return;
+      }
+      if (!code) return;
+      if (state !== sessionStorage.getItem('adgen.oauth_state')) {
+        this.notify('OAuth state mismatch — CSRF protection triggered', 'error');
+        history.replaceState({}, '', window.location.pathname);
+        return;
+      }
+      const verifier = sessionStorage.getItem('adgen.pkce_verifier');
+      if (!verifier) { this.notify('PKCE verifier lost', 'error'); return; }
+      try {
+        const redirectUri = window.location.origin + window.location.pathname;
+        const r = await fetch(this.OAUTH_TOKEN, {
+          method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ grant_type:'authorization_code', code,
+            redirect_uri:redirectUri, client_id:this.auth.clientId, code_verifier:verifier }),
+        });
+        if (!r.ok) throw new Error(`Token exchange ${r.status}: ${(await r.text()).slice(0,300)}`);
+        const tok = await r.json();
+        this.auth.accessToken = tok.access_token;
+        this.auth.refreshToken = tok.refresh_token || '';
+        this.auth.tokenExpiresAt = Date.now() + (tok.expires_in || 3600) * 1000;
+        if (tok.id_token) {
+          try {
+            const payload = JSON.parse(atob(tok.id_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+            this.auth.userInfo = { email: payload.email, name: payload.name, sub: payload.sub };
+          } catch(e) {}
+        }
+        this.saveAuth();
+        history.replaceState({}, '', window.location.pathname);
+        sessionStorage.removeItem('adgen.pkce_verifier');
+        sessionStorage.removeItem('adgen.oauth_state');
+        this.loggingIn = false;
+        this.notify('Successfully connected to Higgsfield.');
+      } catch(e) {
+        this.notify('Token exchange failed: ' + e.message, 'error');
+        this.loggingIn = false;
+      }
+    },
+
+    logout() {
+      if (!confirm('Really sign out? You will need to log in again next time.')) return;
+      const keepId = this.auth.clientId;
+      this.auth = { clientId: keepId, accessToken:'', refreshToken:'', tokenExpiresAt:0, userInfo:null };
+      this.saveAuth();
+      this.notify('Signed out.');
+    },
+
+    renameModelKey(oldKey, newKey) {
+      if (!newKey || newKey === oldKey) return;
+      const eps = this.settings.modelEndpoints;
+      eps[newKey] = eps[oldKey];
+      delete eps[oldKey];
+      this.saveSettings();
+    },
+
+    addModelEndpoint() {
+      const name = prompt('Model name (key):'); if (!name) return;
+      const path = prompt('Endpoint path:'); if (!path) return;
+      this.settings.modelEndpoints[name] = path;
+      this.saveSettings();
+    },
+
+    resetModelEndpoints() {
+      if (!confirm('Reset model paths to defaults?')) return;
+      this.resetModelEndpointsToDefaults();
+      this.saveSettings();
+    },
+
+    // ---- Utilities ----
+    notify(message, type = 'success') {
+      this.toast = { show: true, message, type };
+      setTimeout(() => this.toast.show = false, 2500);
+    },
+
+    blobUrl(blob) {
+      if (!blob) return '';
+      if (this.blobUrlCache.has(blob)) return this.blobUrlCache.get(blob);
+      const url = URL.createObjectURL(blob);
+      this.blobUrlCache.set(blob, url);
+      return url;
+    },
+
+    uid() {
+      return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+    },
+
+    autoDownload(blob, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    },
+
+    downloadJob(job) {
+      if (!job.outputBlob) return;
+      this.autoDownload(job.outputBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${job.requestId?.slice(0,8)||'job'}.png`);
+    },
+
+    copyPrompt(job) {
+      navigator.clipboard.writeText(job.prompt || '').then(() => this.notify('Prompt copied to clipboard.'));
+    },
+
+    async blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    },
+
+    base64ToBlob(b64, mimeType) {
+      const byteStr = atob(b64);
+      const ia = new Uint8Array(byteStr.length);
+      for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+      return new Blob([ia], { type: mimeType });
+    },
+
+    // ---- Brand Kit file handlers ----
+    bkHandleFileInput(event, target) {
+      const files = Array.from(event.target.files || []).filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      if (target === 'logo')   files.forEach(f => this.brandKit.logoImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
+      if (target === 'mascot') files.forEach(f => this.brandKit.mascotImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
+      event.target.value = '';
+    },
+
+    bkHandleDrop(event, target) {
+      const files = Array.from(event.dataTransfer.files||[]).filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      if (target === 'logo')   files.forEach(f => this.brandKit.logoImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
+      if (target === 'mascot') files.forEach(f => this.brandKit.mascotImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
+    },
+
+    bkHandleFontInput(event) {
+      const files = Array.from(event.target.files || []);
+      for (const f of files) {
+        this.brandKit.fontFiles.push({ id: this.uid(), name: f.name, label: f.name.replace(/\.[^.]+$/, ''), blob: f });
+      }
+      event.target.value = '';
+    },
+
+    bkHandleFontDrop(event) {
+      const files = Array.from(event.dataTransfer.files||[]).filter(f => /\.(ttf|woff2?|otf)$/i.test(f.name));
+      for (const f of files) {
+        this.brandKit.fontFiles.push({ id: this.uid(), name: f.name, label: f.name.replace(/\.[^.]+$/, ''), blob: f });
+      }
+    },
+
+    bkHandleMarkdown(event) {
+      const f = event.target.files[0];
+      if (!f) return;
+      f.text().then(text => {
+        const existing = this.brandKit.description?.trim();
+        if (existing && !confirm('Replace existing description? OK = replace, Cancel = append.')) {
+          this.brandKit.description = existing + '\n\n---\n\n' + text;
+          return;
+        }
+        this.brandKit.description = text;
+        this.notify(`${f.name} loaded (${Math.round(text.length/1024)} kB).`);
+      });
+      event.target.value = '';
+    },
+
+    // ---- Products ----
+    emptyProduct() {
+      return { title:'', category:'', images:[], description:'', flavor:'', ageRange:'', keyIngredients:[], nutritionNotes:'' };
+    },
+
+    openProductModal(product = null) {
+      this.productModal = {
+        open: true, editing: !!product,
+        product: product ? { ...this.emptyProduct(), ...product, images: [...(product.images||[])] } : this.emptyProduct(),
+      };
+    },
+
+    closeProductModal() { this.productModal = { open:false, editing:false, product:null }; this.dragState=null; },
+
+    prodHandleImgInput(event) {
+      const files = Array.from(event.target.files||[]).filter(f => f.type.startsWith('image/'));
+      for (const f of files) this.productModal.product.images.push({ id:this.uid(), name:f.name, blob:f });
+      event.target.value = '';
+    },
+
+    prodHandleImgDrop(event) {
+      const files = Array.from(event.dataTransfer.files||[]).filter(f => f.type.startsWith('image/'));
+      for (const f of files) this.productModal.product.images.push({ id:this.uid(), name:f.name, blob:f });
+    },
+
+    saveProduct() {
+      const p = { ...this.productModal.product };
+      if (!p.title || !p.category || !p.images.length) return;
+      if (!p.id) p.id = this.uid();
+      if (this.productModal.editing) {
+        const idx = this.products.findIndex(x => x.id === p.id);
+        if (idx >= 0) this.products.splice(idx, 1, p); else this.products.push(p);
+      } else {
+        this.products.push(p);
+        // Auto-select newly added products for generation
+        if (!this.generateForm.productIds.includes(p.id)) {
+          this.generateForm.productIds.push(p.id);
+        }
+      }
+      this.closeProductModal();
+      this.notify('Product saved.');
+    },
+
+    deleteProduct() {
+      if (!confirm('Really delete this product?')) return;
+      const idx = this.products.findIndex(p => p.id === this.productModal.product.id);
+      if (idx >= 0) { this.products.splice(idx, 1); this.generateForm.productIds = this.generateForm.productIds.filter(id => id !== this.productModal.product.id); }
+      this.closeProductModal();
+      this.notify('Product deleted.');
+    },
+
+    // ---- References ----
+    emptyRef() {
+      return { name:'', imageBlob:null, tags:[], notes:'', sourceUrl:'', extractedPrinciple:'' };
+    },
+
+    openReferenceModal(ref = null) {
+      const source = ref ? (this.ownReferences.find(r => r.id === ref?.id) ? 'own' : 'competitor') : this.refTab;
+      this.referenceModal = {
+        open:true, editing:!!ref, source,
+        ref: ref ? { ...this.emptyRef(), ...ref } : this.emptyRef(),
+      };
+    },
+
+    closeReferenceModal() { this.referenceModal = { open:false, editing:false, source:'competitor', ref:null }; this.dragState=null; },
+
+    handleRefImageInput(event) {
+      const f = event.target.files[0];
+      if (f) this.referenceModal.ref.imageBlob = f;
+      event.target.value = '';
+    },
+
+    handleRefImageDrop(event) {
+      const f = Array.from(event.dataTransfer.files||[]).find(x => x.type.startsWith('image/'));
+      if (f) this.referenceModal.ref.imageBlob = f;
+    },
+
+    handleBulkRefDrop(event) {
+      const files = Array.from(event.dataTransfer.files||[]).filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      const arr = this.refTab === 'own' ? this.ownReferences : this.references;
+      for (const f of files) {
+        arr.push({ id:this.uid(), name:f.name.replace(/\.[^.]+$/,''), imageBlob:f, tags:[], notes:'', sourceUrl:'', extractedPrinciple:'' });
+      }
+      this.notify(files.length + ' reference(s) added.');
+    },
+
+    saveReference() {
+      const ref = { ...this.referenceModal.ref };
+      if (!ref.imageBlob) return;
+      if (!ref.id) ref.id = this.uid();
+      const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.references;
+      if (this.referenceModal.editing) {
+        const idx = arr.findIndex(r => r.id === ref.id);
+        if (idx >= 0) arr.splice(idx, 1, ref); else arr.push(ref);
+      } else {
+        arr.push(ref);
+      }
+      this.closeReferenceModal();
+      this.notify('Reference saved.');
+    },
+
+    deleteReference() {
+      if (!confirm('Really delete this reference?')) return;
+      const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.references;
+      const idx = arr.findIndex(r => r.id === this.referenceModal.ref.id);
+      if (idx >= 0) { arr.splice(idx, 1); this.generateForm.referenceIds = this.generateForm.referenceIds.filter(id => id !== this.referenceModal.ref.id); }
+      this.closeReferenceModal();
+      this.notify('Reference deleted.');
+    },
+
+    // ============================================================
+    // HIGGSFIELD MCP CLIENT
+    // ============================================================
+    async mcpCall(toolName, toolArgs) {
+      if (!this.auth.accessToken) throw new Error('Not logged in. Please sign in with Higgsfield first.');
+      const reqBody = { jsonrpc:'2.0', id:Date.now(), method:'tools/call', params:{ name:toolName, arguments:toolArgs } };
+      let res;
+      try {
+        res = await fetch('/api/mcp', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'Accept':'application/json, text/event-stream',
+            'Authorization':`Bearer ${this.auth.accessToken}`, 'Mcp-Protocol-Version':'2025-06-18' },
+          body: JSON.stringify(reqBody),
+        });
+      } catch(e) { throw new Error(`Network error at MCP/${toolName}: ${e.message}`); }
+      const raw = await res.text();
+      if (!res.ok) throw new Error(`MCP ${res.status} at ${toolName}: ${raw.slice(0,300)}`);
+      let parsed = null;
+      for (const line of raw.split(/\r?\n/)) {
+        if (line.startsWith('data: ')) { try { parsed = JSON.parse(line.slice(6)); break; } catch(e) {} }
+      }
+      if (!parsed) { try { parsed = JSON.parse(raw); } catch(e) { throw new Error(`MCP response not parseable at ${toolName}: ${raw.slice(0,200)}`); } }
+      if (parsed.error) throw new Error(`MCP error ${parsed.error.code} at ${toolName}: ${parsed.error.message}`);
+      const result = parsed.result || {};
+      return result.structuredContent || result;
+    },
+
+    async hfUploadImage(blob) {
+      const contentType = blob.type || 'image/png';
+      const ext = (contentType.split('/')[1] || 'png').toLowerCase();
+      const filename = `image_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+      const uploadRes = await this.mcpCall('media_upload', { filename, content_type: contentType });
+      const upload = (uploadRes.uploads || [])[0];
+      if (!upload) throw new Error('media_upload returned no upload: ' + JSON.stringify(uploadRes).slice(0,300));
+      const put = await fetch(upload.upload_url, {
+        method: upload.method || 'PUT',
+        headers: { 'Content-Type': upload.content_type || contentType },
+        body: blob,
+      });
+      if (!put.ok) throw new Error(`PUT upload HTTP ${put.status}`);
+      await this.mcpCall('media_confirm', { type:'image', media_id: upload.media_id });
+      return upload.media_id;
+    },
+
+    async hfUploadImages(blobs) {
+      return Promise.all(blobs.map(b => this.hfUploadImage(b)));
+    },
+
+    async hfGenerate(modelKey, { prompt, aspect_ratio, mediaIds, count }) {
+      const endpoint = this.settings.modelEndpoints?.[modelKey] || modelKey;
+      const params = { model: endpoint, prompt };
+      if (aspect_ratio) params.aspect_ratio = aspect_ratio;
+      if (count) params.count = count;
+      if (mediaIds && mediaIds.length) params.medias = mediaIds.map(id => ({ value:id, role:'image' }));
+      return this.mcpCall('generate_image', { params });
+    },
+
+    async hfPollJob(jobId, { maxMs = 900000 } = {}) {
+      const start = Date.now();
+      const terminalSuccess = new Set(['completed']);
+      const terminalFail = new Set(['failed','canceled','nsfw','ip_detected']);
+      let lastStatus = null, lastHeartbeat = 0, consecutiveErrors = 0;
+      while (Date.now() - start < maxMs) {
+        const elapsedS = Math.floor((Date.now() - start) / 1000);
+        let res;
+        try {
+          res = await this.mcpCall('job_status', { jobId });
+          consecutiveErrors = 0;
+        } catch(e) {
+          consecutiveErrors++;
+          const isTransient = /\b50[0-9]\b|Network error|timeout|Cloudflare/i.test(e.message);
+          if (!isTransient || consecutiveErrors >= 20) throw new Error(`Polling failed after ${consecutiveErrors} attempts: ${e.message.slice(0,180)}`);
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+        const gen = res.generation || {};
+        const status = (gen.status || '').toLowerCase();
+        if (status !== lastStatus) { console.log(`[poll ${jobId.slice(0,8)}] status=${status} (${elapsedS}s)`); lastStatus = status; }
+        else if (elapsedS - lastHeartbeat >= 30) { console.log(`[poll] still ${status} (${elapsedS}s)`); lastHeartbeat = elapsedS; }
+        if (terminalSuccess.has(status)) return gen;
+        if (terminalFail.has(status)) throw new Error(`Job ${status}: ${JSON.stringify(gen).slice(0,300)}`);
+        await new Promise(r => setTimeout(r, Math.max(1500, (res.poll_after_seconds||2)*1000)));
+      }
+      throw new Error(`Polling timeout after ${Math.floor(maxMs/60000)} min`);
+    },
+
+    // ============================================================
+    // GOOGLE GEMINI CLIENT
+    // ============================================================
+    async geminiGenerate(prompt, imageBlobs = []) {
+      const apiKey = this.settings.googleApiKey;
+      if (!apiKey) throw new Error('Google API Key not set in Settings.');
+      const parts = [];
+      for (const blob of imageBlobs) {
+        const base64 = await this.blobToBase64(blob);
+        parts.push({ inlineData: { mimeType: blob.type || 'image/jpeg', data: base64 } });
+      }
+      parts.push({ text: prompt });
+      const body = {
+        contents: [{ parts }],
+        generationConfig: { responseModalities: ['TEXT','IMAGE'] },
+      };
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
+        { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) }
+      );
+      if (!res.ok) throw new Error(`Gemini API ${res.status}: ${(await res.text()).slice(0,300)}`);
+      const data = await res.json();
+      const parts_out = data?.candidates?.[0]?.content?.parts || [];
+      const imagePart = parts_out.find(p => p.inlineData);
+      if (!imagePart) throw new Error('No image in Gemini response: ' + JSON.stringify(data).slice(0,300));
+      return { base64: imagePart.inlineData.data, mimeType: imagePart.inlineData.mimeType || 'image/png' };
+    },
+
+    // ============================================================
+    // PROMPT BUILDERS
+    // ============================================================
+    buildProductContext() {
+      const prods = this.selectedProducts;
+      if (!prods.length) return '';
+      const lines = prods.slice(0, 3).map(p => {
+        let line = `- ${p.title} (${p.category}${p.flavor ? ', '+p.flavor : ''}${p.ageRange ? ', '+p.ageRange : ''})`;
+        if (p.nutritionNotes) line += `\n  Nutrition: ${p.nutritionNotes.slice(0,60)}`;
+        if (p.keyIngredients?.length) line += `\n  Key ingredients: ${p.keyIngredients.slice(0,4).join(', ')}`;
+        return line;
+      });
+      return `\n\nPRODUCTS IN THIS AD:\n${lines.join('\n')}`;
+    },
+
+    buildPrompt(reference) {
+      const kit = this.brandKit;
+      const tone = (kit.toneAdjectives||[]).join(', ') || 'energetic, playful, bold';
+      const dos  = (kit.doExamples||[]).map(d => `- ${d}`).join('\n');
+      const donts= (kit.dontExamples||[]).map(d => `- ${d}`).join('\n');
+      const principle = reference?.extractedPrinciple || 'authentic ad composition';
+      const refTags = (reference?.tags||[]).join(', ');
+      const copySamples = (kit.germanCopyExamples||[]).slice(0,3).map(s => `"${s}"`).join(', ');
+      const brandContext = kit.description?.trim()
+        ? `\n\nBrand context:\n"""\n${kit.description.trim().slice(0,1500)}\n"""\n` : '';
+
+      const productBlobs = this.selectedProducts.flatMap(p => p.images?.map(img => img.blob)||[]);
+      const productCount = productBlobs.length || 1;
+      const mascotCount = (kit.mascotImages||[]).length;
+      const hasMascot = mascotCount > 0;
+      const ordinals = ['FIRST','SECOND','THIRD','FOURTH','FIFTH','SIXTH','SEVENTH','EIGHTH'];
+
+      const productLine = productCount === 1
+        ? `The FIRST image is the EXACT PRODUCT — preserve The Better Cat packaging and label typography exactly as shown.`
+        : `The FIRST ${productCount} images are PRODUCT REFERENCES — all must appear correctly. Preserve packaging artwork and label typography precisely.`;
+
+      const mascotStartIdx = productCount;
+      const mascotLine = hasMascot
+        ? mascotCount === 1
+          ? `\n\nThe ${ordinals[mascotStartIdx]} image is the SPHYNX CAT MASCOT — preserve its character design EXACTLY. Must appear with strong expression (tongue out, winking, mid-yell, or attitude). Never passive, never generic-cute.`
+          : `\n\nThe ${ordinals[mascotStartIdx]} to ${ordinals[Math.min(mascotStartIdx+mascotCount-1,7)]} images are SPHYNX CAT MASCOT REFERENCES — study all of them to understand the mascot's character design and preserve it EXACTLY. Must appear with strong expression (tongue out, winking, mid-yell, or attitude). Never passive, never generic-cute.`
+        : '';
+
+      const refIdx = productCount + mascotCount;
+      const refLine = reference
+        ? `\n\n=== STRUCTURAL REFERENCE ===\nThe ${ordinals[refIdx]} image is a STRUCTURAL TEMPLATE. Strongly follow its layout pattern: composition, scene type, panels, framing, badge/text positions. Concept: '${principle}'${refTags ? ` (tags: ${refTags})` : ''}.
+
+KEEP FROM REFERENCE: layout pattern, composition, framing, panel arrangement, energy.
+SWAP TO TBC BRAND IDENTITY:
+- Product → The Better Cat product from product image(s)
+- Character → ${hasMascot ? 'the Sphynx mascot from the mascot image(s)' : 'an expressive Sphynx cat with attitude'}
+- Colors → TBC Sky #18044D, TBC Yellow #FFE026, TBC Orange #FA7B3C, TBC Oat #FCF6E0 only
+- Copy → German, TBC brand voice, left-aligned, max 1-2 lines
+- Typography → Degural Display headlines, Arbeit body
+
+The final output must feel unmistakably like a The Better Cat ad.`
+        : '';
+
+      const imageGuide = productLine + mascotLine + refLine;
+      const angleBlock = this.generateForm.angle
+        ? `\n\nCAMPAIGN ANGLE: Focus this ad specifically on the angle: "${this.generateForm.angle}". Scene, composition, copy, and visual mood should all serve this angle.`
+        : '';
+      const productContext = this.buildProductContext();
+      const mascotDesc = kit.mascotDescription ? `\nMascot: ${kit.mascotDescription}.` : '';
+
+      return `The Better Cat — premium cat food ad, ${this.generateForm.aspect}, bold graphic brand world (${tone}).
+
+${imageGuide}${angleBlock}${productContext}
+
+Visual style: large left-aligned Degural Display headlines, Arbeit body copy, bold full-bleed colour backgrounds, graphic cut-out mascot style. Hero colour TBC Orange (#FA7B3C) as dominant anchor.${mascotDesc}
+
+Brand colors (use max 4): TBC Sky #18044D, TBC Yellow #FFE026, TBC Orange #FA7B3C, TBC Oat #FCF6E0.
+
+Do:
+${dos || '- Sphynx mascot with attitude, bold headlines, strong contrast'}
+
+Don't:
+${donts || '- generic stock imagery, passive cats, busy cluttered scenes'}
+
+${copySamples ? `Copy reference: ${copySamples}.` : ''}${brandContext}
+
+Copy language: GERMAN. All text in the image must be in German. Brand statements left-aligned, max 1-2 lines. No drop shadows, no gradients on type. Rebellious, confident, premium cat food energy.`;
+    },
+
+    buildShopPrompt(templateId, references = []) {
+      const kit = this.brandKit;
+      const tpl = this.shopTemplates.find(t => t.id === templateId) || this.shopTemplates[0];
+      const tone = (kit.toneAdjectives||[]).join(', ') || 'energetic, playful, bold';
+      const dos  = (kit.doExamples||[]).map(d => `- ${d}`).join('\n');
+      const donts= (kit.dontExamples||[]).map(d => `- ${d}`).join('\n');
+      const copySamples = (kit.germanCopyExamples||[]).slice(0,3).map(s => `"${s}"`).join(', ');
+      const brandContext = kit.description?.trim()
+        ? `\n\nBrand context:\n"""\n${kit.description.trim().slice(0,1500)}\n"""\n` : '';
+
+      const productBlobs = this.selectedProducts.flatMap(p => p.images?.map(img => img.blob)||[]);
+      const productCount = productBlobs.length || 1;
+      const mascotCount = (kit.mascotImages||[]).length;
+      const hasMascot = mascotCount > 0;
+      const ordinals = ['FIRST','SECOND','THIRD','FOURTH','FIFTH','SIXTH','SEVENTH','EIGHTH'];
+
+      const productLine = productCount === 1
+        ? `The FIRST image is the EXACT PRODUCT — preserve The Better Cat packaging and label typography exactly.`
+        : `The FIRST ${productCount} images are PRODUCT REFERENCES — all must appear correctly. Preserve packaging artwork and label typography precisely.`;
+
+      const mascotStartIdx = productCount;
+      const mascotLine = hasMascot
+        ? mascotCount === 1
+          ? `\n\nThe ${ordinals[mascotStartIdx]} image is the SPHYNX CAT MASCOT — preserve its character design EXACTLY across all generations.`
+          : `\n\nThe ${ordinals[mascotStartIdx]} to ${ordinals[Math.min(mascotStartIdx+mascotCount-1,7)]} images are SPHYNX CAT MASCOT REFERENCES — study all to understand the mascot's character and preserve it EXACTLY across all generations.`
+        : '';
+      const mascotDesc = kit.mascotDescription ? `\nMascot: ${kit.mascotDescription}.` : '';
+
+      const refs = references || [];
+      let refLine = '';
+      if (refs.length > 0) {
+        const startIdx = productCount + mascotCount;
+        const slotDesc = refs.length === 1
+          ? `The ${ordinals[startIdx]} image is a STYLE REFERENCE`
+          : `The ${ordinals[startIdx]} to ${ordinals[Math.min(startIdx+refs.length-1,7)]} images are STYLE REFERENCES`;
+        const principles = refs.map(r => r?.extractedPrinciple).filter(Boolean).join(' / ');
+        const refTags = [...new Set(refs.flatMap(r => r?.tags||[]))].join(', ');
+        refLine = `\n\n=== STYLE REFERENCE (inspiration only) ===\n${slotDesc}. Use ONLY as inspiration for photographic style, lighting, mood, color treatment, framing.${principles ? ` Look to capture: ${principles}.` : ''}${refTags ? ` (tags: ${refTags})` : ''}\nDo NOT copy the reference's product, brand, logos, text or exact layout.`;
+      }
+
+      const productContext = this.buildProductContext();
+      const angleBlock = this.generateForm.angle
+        ? `\n\nCAMPAIGN ANGLE: "${this.generateForm.angle}".`
+        : '';
+
+      const scenes = {
+        hero: {
+          intro: 'Premium e-commerce HERO / BANNER image',
+          body: `Wide above-the-fold hero banner. The Better Cat product is the clear hero, placed slightly off-center with generous clean negative space on one side for a headline to be added later. Bold solid colour background in TBC Orange (#FA7B3C) or TBC Yellow (#FFE026). Soft premium product photography lighting, gentle depth of field.`,
+          text: 'Leave clean negative space for a German headline. If any text appears, it must be German, sharp and readable.',
+        },
+        lifestyle: {
+          intro: 'Authentic LIFESTYLE / in-use product image',
+          body: `Real cat parent scene — joyful, warm, cat interacting with owner. Bold solid colour background (TBC Yellow #FFE026, TBC Sky #18044D, or TBC Orange #FA7B3C). Expressive cat, not passive. Product packaging clearly visible.`,
+          text: 'Minimal or no text. Natural and candid, never stiff or stock-photo-like.',
+        },
+        benefit: {
+          intro: 'Clean BENEFIT / FEATURE graphic',
+          body: `The Better Cat product centered on a clean TBC Sky (#18044D) or TBC Oat (#FCF6E0) background. Around it, 3-4 benefit callouts as simple modern icon + short English label pairs, visually tied to the product. Flat minimal icons in brand colors, clear visual hierarchy.`,
+          text: `Short German benefit labels, 2-4 words each.${copySamples ? ` Tone reference: ${copySamples}.` : ''}`,
+        },
+        clean: {
+          intro: 'Clean CATALOG product image',
+          body: `The Better Cat product cleanly isolated on pure white seamless background, centered. Soft realistic studio shadow. Crisp focus, true-to-life colors, no props.`,
+          text: 'No text, no graphics, no badges. Just the product, clean and sharp.',
+        },
+      };
+      const scene = scenes[tpl.id] || scenes.clean;
+
+      return `${scene.intro} for The Better Cat online shop, ${tpl.aspect}, bold graphic brand world (${tone}).
+
+${productLine}${mascotLine}${refLine}${angleBlock}${productContext}
+
+SCENE & COMPOSITION:
+${scene.body}
+
+Visual style: large left-aligned Degural Display headlines, Arbeit body copy, bold colours. Brand colors (max 4): TBC Sky #18044D, TBC Yellow #FFE026, TBC Orange #FA7B3C, TBC Oat #FCF6E0.${mascotDesc}
+
+Do:
+${dos || '- bold colours, expressive cats, clean compositions'}
+
+Don't:
+${donts || '- generic stock imagery, passive cats'}
+${brandContext}
+${scene.text} Copy language: GERMAN. All text in the image must be in German. Rebellious, confident, premium cat food energy.`;
+    },
+
+    // ============================================================
+    // GENERATE FLOW
+    // ============================================================
+    stopGenerating() {
+      this.abortRequested = true;
+      this.generating = false;
+      this.currentStep = 'Stopped';
+    },
+
+    async runGenerate() {
+      if (!this.canGenerate()) return;
+      this.generating = true;
+      this.abortRequested = false;
+      this.currentStep = 'Starting…';
+
+      const f = this.generateForm;
+      const kit = this.brandKit;
+      const refs = f.referenceIds.map(id => this.referenceById(id)).filter(Boolean);
+      const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img => img.blob));
+      const mascotBlobs = (kit.mascotImages||[]).map(m => m.blob);
+
+      let jobs = [];
+      const cnt = Math.max(1, f.count || 1);
+      if (this.genType === 'shop') {
+        const tpls = f.shopTemplateIds.map(id => this.shopTemplates.find(t => t.id===id)).filter(Boolean);
+        for (const t of tpls) {
+          const per = tpls.length === 1 ? cnt : 1;
+          for (let i = 0; i < per; i++)
+            jobs.push({ label: per>1 ? `${t.label} – Variant ${i+1}` : t.label, refs:[...refs], template:t.id, status:'pending' });
+        }
+      } else if (refs.length === 0) {
+        for (let i = 0; i < cnt; i++) jobs.push({ label:`Variant ${i+1} (no ref)`, refs:[], status:'pending' });
+      } else if (f.mode === 'per-ref') {
+        for (const r of refs) {
+          const perRef = refs.length===1 ? cnt : 1;
+          for (let i = 0; i < perRef; i++) {
+            const base = r.name || 'Reference';
+            jobs.push({ label: perRef>1 ? `${base} – Variant ${i+1}` : base, refs:[r], status:'pending' });
+          }
+        }
+      } else {
+        for (let i = 0; i < cnt; i++) jobs.push({ label:`Consolidated ${i+1}`, refs, status:'pending' });
+      }
+
+      this.currentRun = { startedAt: Date.now(), jobs };
+
+      try {
+        if (this.settings.imageBackend === 'google') {
+          // ---- GEMINI PATH ----
+          this.currentStep = `Generating ${jobs.length} image(s) with Gemini…`;
+          await Promise.all(this.currentRun.jobs.map(async (job, idx) => {
+            try {
+              job.status = 'in_progress';
+              const refForJob = job.refs[0] || null;
+              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
+              const extras = f.customPrompt?.trim();
+              const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS ===\n${extras}` : basePrompt;
+              job.prompt = prompt;
+
+              const tplObj = job.template ? this.shopTemplates.find(t => t.id===job.template) : null;
+              job.aspect = tplObj?.aspect || f.aspect;
+
+              const imageBlobs = f.sendImages
+                ? [...productBlobs, ...mascotBlobs, ...job.refs.map(r=>r.imageBlob).filter(Boolean)]
+                : [];
+
+              const result = await this.geminiGenerate(prompt, imageBlobs);
+              const dataUrl = `data:${result.mimeType};base64,${result.base64}`;
+              job.outputUrl = dataUrl;
+              job.status = 'completed';
+              job.completedAt = Date.now();
+              const imgBlob = this.base64ToBlob(result.base64, result.mimeType);
+              job.outputBlob = imgBlob;
+              this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${this.uid().slice(0,8)}.png`);
+            } catch(e) {
+              console.error('[gemini job]', e);
+              job.status = 'failed';
+              job.error = e.message;
+            }
+          }));
+        } else {
+          // ---- HIGGSFIELD PATH ----
+          const uniqueRefBlobs = [...new Set(refs.map(r => r.imageBlob))];
+          const allBlobs = [...productBlobs, ...mascotBlobs, ...uniqueRefBlobs];
+          this.currentStep = `Uploading ${allBlobs.length} images to Higgsfield…`;
+          let mediaIds;
+          try {
+            mediaIds = await this.hfUploadImages(allBlobs);
+          } catch(e) {
+            this.notify('Upload failed: ' + e.message, 'error');
+            this.generating = false; this.currentStep = ''; return;
+          }
+          this.currentStep = `Sending ${jobs.length} generation request(s)…`;
+          let cursor = 0;
+          const productMediaIds = productBlobs.map(() => mediaIds[cursor++]);
+          const mascotMediaIds = mascotBlobs.map(() => mediaIds[cursor++]);
+          const refMediaIdMap = new Map();
+          uniqueRefBlobs.forEach(b => refMediaIdMap.set(b, mediaIds[cursor++]));
+
+          await Promise.all(this.currentRun.jobs.map(async (job, idx) => {
+            try {
+              job.status = 'queued';
+              const refForJob = job.refs[0] || null;
+              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
+              const extras = f.customPrompt?.trim();
+              const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS (high priority) ===\n${extras}` : basePrompt;
+              job.prompt = prompt;
+
+              const jobMediaIds = [...productMediaIds, ...mascotMediaIds];
+              for (const r of job.refs) { const mid = refMediaIdMap.get(r.imageBlob); if (mid) jobMediaIds.push(mid); }
+
+              const tplObj = job.template ? this.shopTemplates.find(t=>t.id===job.template) : null;
+              const jobAspect = tplObj?.aspect || f.aspect;
+              job.aspect = jobAspect;
+              job.requestBody = { prompt, aspect_ratio:jobAspect, mediaIds:jobMediaIds, count:1 };
+              job.endpoint = this.settings.modelEndpoints?.[f.model] || f.model;
+
+              const submitRes = await this.hfGenerate(f.model, job.requestBody);
+              const firstResult = submitRes.results?.[0];
+              const jobId = firstResult?.id;
+              if (!jobId) throw new Error('No job-id in response: ' + JSON.stringify(submitRes).slice(0,300));
+              job.requestId = jobId;
+              job.status = 'in_progress';
+
+              let final;
+              if ((firstResult.status||'').toLowerCase() === 'completed' && firstResult.results?.rawUrl) {
+                final = firstResult;
+              } else {
+                final = await this.hfPollJob(jobId);
+              }
+              const imageUrl = final.results?.rawUrl || final.results?.minUrl;
+              if (!imageUrl) throw new Error('No image URL in response: ' + JSON.stringify(final).slice(0,300));
+
+              job.outputUrl = imageUrl;
+              job.status = 'completed';
+              job.completedAt = Date.now();
+
+              let imgBlob = null;
+              try {
+                const imgRes = await fetch(imageUrl);
+                if (!imgRes.ok) throw new Error(`CDN HTTP ${imgRes.status}`);
+                imgBlob = await imgRes.blob();
+                job.outputBlob = imgBlob;
+              } catch(e) {
+                console.warn(`[job ${idx}] Image download failed (display still works):`, e);
+                this.notify('Image ready, but CDN download blocked. Right-click → Save image as workaround.');
+              }
+
+              if (imgBlob) {
+                this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${jobId.slice(0,8)}.png`);
+              }
+            } catch(e) {
+              console.error(e);
+              job.status = 'failed';
+              job.error = e.message;
+            }
+          }));
+        }
+
+        this.notify('Run completed.');
+      } finally {
+        this.generating = false;
+        this.currentStep = '';
+      }
+    },
+
+    async refineJob(parentJob) {
+      const feedback = (parentJob.refineText || '').trim();
+      if (!feedback) return;
+      if (!parentJob.outputBlob && !parentJob.outputUrl) { this.notify('No image available to improve.', 'error'); return; }
+      if (this.generating) { this.notify('Please wait until the current run is finished.', 'error'); return; }
+
+      this.generating = true;
+      this.currentStep = 'Improvement running…';
+
+      if (!this.currentRun) this.currentRun = { startedAt: Date.now(), jobs: [] };
+      const parentLabel = (parentJob.label || 'Variant').replace(/\s+– Improvement.*$/, '');
+      this.currentRun.jobs.push({ label:`${parentLabel} – Improvement`, refs:[], status:'pending', refineFeedback:feedback });
+      const job = this.currentRun.jobs[this.currentRun.jobs.length - 1];
+      parentJob.refineOpen = false;
+      parentJob.refineText = '';
+
+      try {
+        job.status = 'queued';
+
+        let outputBlob = parentJob.outputBlob;
+        if (!outputBlob && parentJob.outputUrl && !parentJob.outputUrl.startsWith('data:')) {
+          const res = await fetch(parentJob.outputUrl);
+          if (!res.ok) throw new Error(`CDN HTTP ${res.status}`);
+          outputBlob = await res.blob();
+        } else if (!outputBlob && parentJob.outputUrl?.startsWith('data:')) {
+          const b64 = parentJob.outputUrl.split(',')[1];
+          const mime = parentJob.outputUrl.split(';')[0].split(':')[1];
+          outputBlob = this.base64ToBlob(b64, mime);
+        }
+
+        const f = this.generateForm;
+        const kit = this.brandKit;
+        const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img=>img.blob));
+        const mascotBlobs = (kit?.mascotImages||[]).map(m => m.blob);
+
+        if (this.settings.imageBackend === 'google') {
+          const imageBlobs = [outputBlob, ...productBlobs, ...mascotBlobs].filter(Boolean);
+          const prompt = `Refine this image based on user feedback.\n\nFEEDBACK:\n${feedback}\n\nKeep composition, brand colors, product accuracy, and mascot identity exactly the same unless feedback explicitly says to change them. Output a single refined version.`;
+          job.prompt = prompt;
+          job.status = 'in_progress';
+          const result = await this.geminiGenerate(prompt, imageBlobs);
+          const dataUrl = `data:${result.mimeType};base64,${result.base64}`;
+          job.outputUrl = dataUrl;
+          job.status = 'completed';
+          job.completedAt = Date.now();
+          const imgBlob = this.base64ToBlob(result.base64, result.mimeType);
+          job.outputBlob = imgBlob;
+          this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${this.uid().slice(0,8)}.png`);
+        } else {
+          const allBlobs = [outputBlob, ...productBlobs, ...mascotBlobs].filter(Boolean);
+          this.currentStep = `Uploading ${allBlobs.length} images…`;
+          const mediaIds = await this.hfUploadImages(allBlobs);
+
+          let anchorDesc = '';
+          if (productBlobs.length > 0 && mascotBlobs.length > 0) {
+            anchorDesc = `Images 2-${1+productBlobs.length} are the brand's product (preserve packaging exactly). Images ${2+productBlobs.length}-${1+productBlobs.length+mascotBlobs.length} are the brand mascot (preserve character design exactly).`;
+          } else if (productBlobs.length > 0) {
+            anchorDesc = `Images 2-${1+productBlobs.length} are the brand's product (preserve packaging exactly).`;
+          } else if (mascotBlobs.length > 0) {
+            anchorDesc = `Image${mascotBlobs.length > 1 ? 's 2-'+(1+mascotBlobs.length) : ' 2'} ${mascotBlobs.length > 1 ? 'are' : 'is'} the brand mascot (preserve character design exactly).`;
+          }
+
+          const prompt = `Refine the FIRST image based on user feedback. ${anchorDesc}\n\nUSER FEEDBACK:\n${feedback}\n\nApply this feedback as a targeted edit. Keep composition, layout, brand colors, product accuracy, and mascot identity the same unless feedback says otherwise. All text in the image must be in German, left-aligned, max 1-2 lines.`;
+          job.prompt = prompt;
+          const refineAspect = parentJob.aspect || parentJob.requestBody?.aspect_ratio || f.aspect;
+          const requestBody = { prompt, aspect_ratio:refineAspect, mediaIds:[...mediaIds], count:1 };
+          job.requestBody = requestBody;
+          job.endpoint = this.settings.modelEndpoints?.[f.model] || f.model;
+
+          const submitRes = await this.hfGenerate(f.model, requestBody);
+          const firstResult = submitRes.results?.[0];
+          const jobId = firstResult?.id;
+          if (!jobId) throw new Error('No job-id in response: ' + JSON.stringify(submitRes).slice(0,300));
+          job.requestId = jobId;
+          job.status = 'in_progress';
+
+          let final;
+          if ((firstResult.status||'').toLowerCase() === 'completed' && firstResult.results?.rawUrl) {
+            final = firstResult;
+          } else {
+            final = await this.hfPollJob(jobId);
+          }
+          const imageUrl = final.results?.rawUrl || final.results?.minUrl;
+          if (!imageUrl) throw new Error('No image URL: ' + JSON.stringify(final).slice(0,300));
+
+          job.outputUrl = imageUrl;
+          job.status = 'completed';
+          job.completedAt = Date.now();
+
+          let imgBlob = null;
+          try {
+            const imgRes = await fetch(imageUrl);
+            if (!imgRes.ok) throw new Error(`CDN HTTP ${imgRes.status}`);
+            imgBlob = await imgRes.blob();
+            job.outputBlob = imgBlob;
+          } catch(e) { console.warn('[refine] Image download failed:', e); }
+
+          if (imgBlob) this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${jobId.slice(0,8)}.png`);
+        }
+
+        this.notify('Improvement done.');
+      } catch(e) {
+        console.error('[refine] failed:', e);
+        job.status = 'failed';
+        job.error = e.message;
+        this.notify('Improvement failed: ' + e.message, 'error');
+      } finally {
+        this.generating = false;
+        this.currentStep = '';
+      }
+    },
+
+  }; // end return
+} // end app()
+</script>
+</body>
+</html>

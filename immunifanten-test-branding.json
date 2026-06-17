@@ -1,0 +1,318 @@
+{
+  "$meta": {
+    "source": "https://immunifanten.de/",
+    "scraped_at": "2026-05-18",
+    "scraper": "Firecrawl MCP (browser session, password bypass via storefront POST)",
+    "shopify_shop": "immunifanten.myshopify.com",
+    "currency": "EUR",
+    "locale": "de",
+    "page_title": "Immunifanten | Zuckerfreie & Vegane Vitamin Gummies für Kinder",
+    "note": "Werte direkt aus den CSS-Custom-Properties des Live-Themes extrahiert. Quelle ist die Theme-Konfiguration des Shopify-Shops, nicht eine LLM-Interpretation."
+  },
+
+  "colors": {
+    "primary": {
+      "hex": "#FF8F06",
+      "rgb": "rgb(255, 143, 6)",
+      "name": "Immunifanten Orange",
+      "usage": "Primary CTA-Buttons, Bubble-Badges, Produktkarten-Variants-Hover, Add-to-Cart-Akzent",
+      "css_var": "--btn-pri-bg-col, --bubble-bg-col, --product-card-add-to-cart-color-button"
+    },
+    "secondary_button": {
+      "hex": "#FFD39E",
+      "name": "Soft Peach",
+      "usage": "Secondary Buttons",
+      "css_var": "--btn-sec-bg-col"
+    },
+    "add_to_cart_green": {
+      "hex": "#315014",
+      "name": "Deep Forest Green",
+      "usage": "Add-to-Cart-Button-Hintergrund (Hauptkonversions-Button)",
+      "css_var": "--add-cart-bg-col"
+    },
+    "theme_primary": {
+      "hex": "#F2DEDA",
+      "name": "Soft Pink/Cream",
+      "usage": "Theme-Primary (sehr weich, vermutlich Hintergrund-Akzente)",
+      "css_var": "--color-primary"
+    },
+    "theme_secondary": {
+      "hex": "#1A1A1A",
+      "name": "Near Black",
+      "usage": "Theme-Secondary, dunkle Flächen",
+      "css_var": "--color-secondary"
+    },
+    "theme_tertiary": {
+      "hex": "#232427",
+      "name": "Charcoal",
+      "usage": "Theme-Tertiary",
+      "css_var": "--color-tertiary"
+    },
+    "accent_green": {
+      "hex": "#2D914A",
+      "name": "Trust Green",
+      "usage": "Akzent (vermutlich Vertrauen, vegan, natürlich)",
+      "css_var": "--color-accent"
+    },
+    "text_primary": {
+      "hex": "#3A3A3A",
+      "rgb": "rgb(58, 58, 58)",
+      "name": "Soft Black",
+      "usage": "Haupttext und Headings",
+      "css_var": "--text-color"
+    },
+    "neutrals": {
+      "background_app": {
+        "hex": "#F3F3F3",
+        "usage": "Body-Background"
+      },
+      "neutral_1": {
+        "hex": "#F8F8F8",
+        "usage": "Produktkarten-Hintergrund",
+        "css_var": "--color-neutral, --product-card-background-color"
+      },
+      "muted": {
+        "hex": "#939393",
+        "usage": "Mute-Texte, Sekundärinformationen",
+        "css_var": "--color-muted"
+      },
+      "compare_at_price": {
+        "hex": "#636363",
+        "usage": "Durchgestrichene Vergleichspreise",
+        "css_var": "--product-card-compare-at-price-color"
+      },
+      "white": "#FFFFFF",
+      "black": "#000000"
+    },
+    "product_card": {
+      "title": "#000000",
+      "background": "#F8F8F8",
+      "subtitle": "#676767",
+      "price": "#000000",
+      "compare_at_price": "#636363",
+      "variant_text": "#FF8F06",
+      "variant_background": "#FFFFFF",
+      "variant_hover_background": "#FF8F06",
+      "variant_hover_text": "#FFFFFF",
+      "border_color": "#934D4D"
+    },
+    "palette_summary": ["#FF8F06", "#FFD39E", "#315014", "#2D914A", "#F2DEDA", "#3A3A3A", "#F8F8F8", "#F3F3F3", "#FFFFFF"]
+  },
+
+  "fonts": {
+    "primary_family": "Poppins, sans-serif",
+    "alternate_family": "Manrope, sans-serif",
+    "body": {
+      "family": "Poppins, sans-serif",
+      "style": "normal",
+      "weight_regular": 400,
+      "weight_bold": 700,
+      "size_base": "16px",
+      "scale": 1.0,
+      "css_vars": {
+        "family": "--font-body-family",
+        "style": "--font-body-style",
+        "weight": "--font-body-weight",
+        "weight_bold": "--font-body-weight-bold",
+        "scale": "--font-body-scale"
+      }
+    },
+    "heading": {
+      "family": "Poppins, sans-serif",
+      "style": "normal",
+      "weight": 700,
+      "h1_size_desktop": "40px",
+      "color": "#3A3A3A",
+      "scale": 1.0,
+      "css_vars": {
+        "family": "--font-heading-family",
+        "style": "--font-heading-style",
+        "weight": "--font-heading-weight",
+        "scale": "--font-heading-scale"
+      }
+    },
+    "font_size_scale": {
+      "xxl": "2.5rem",
+      "xl": "2rem",
+      "lg": "1.75rem",
+      "md": "1.5rem",
+      "sm": "1.25rem",
+      "xs": "1rem",
+      "xxs": "0.875rem",
+      "3xs": "0.75rem",
+      "4xs": "0.625rem",
+      "5xs": "0.5rem"
+    },
+    "line_height_scale": {
+      "3xl": "3rem",
+      "2xl": "2.5rem",
+      "xl": "2.25rem",
+      "lg": "2rem",
+      "md": "1.75rem",
+      "sm": "1.5rem",
+      "xs": "1.25rem",
+      "xxs": "1rem"
+    },
+    "product_card_typography": {
+      "title_size_desktop": "20px",
+      "title_size_tablet": "16px",
+      "title_size_mobile": "14px",
+      "price_size_desktop": "18px",
+      "price_size_tablet": "15px",
+      "price_size_mobile": "12px",
+      "subtitle_size_desktop": "14px"
+    }
+  },
+
+  "logo_treatments": {
+    "primary_logo": {
+      "url": "https://immunifanten.de/cdn/shop/files/IMMUNIFANTENcolorh.png?v=1760613754&width=500",
+      "natural_size": "1920x700",
+      "aspect_ratio": "2.74:1",
+      "format": "PNG with transparency",
+      "treatment": "Horizontal Color-Logo (wahrscheinlich Wortmarke + Elefanten-Bildmarke)",
+      "context": "Hauptlogo der Marke, hochauflösend"
+    },
+    "favicon": {
+      "url": "https://immunifanten.de/cdn/shop/files/IMMUNIFANTENcolor-cropped.png?crop=center&height=32&v=1761647055&width=32",
+      "size": "32x32",
+      "treatment": "Cropped Color-Variante (vermutlich nur Elefant ohne Wortmarke)"
+    },
+    "trust_icons": [
+      {"name": "delivery-truck", "url": "https://immunifanten.de/cdn/shop/files/delivery-truck_2.svg?v=1761661698&width=25", "context": "Versandkostenfrei ab 29€"},
+      {"name": "clock-rotate-right", "url": "https://immunifanten.de/cdn/shop/files/clock-rotate-right.svg?v=1761661698&width=25", "context": "Bis 16 Uhr bestellt - morgen geliefert"},
+      {"name": "bright-star", "url": "https://immunifanten.de/cdn/shop/files/bright-star_1.svg?v=1761661698&width=25", "context": "Kundenbewertungen"},
+      {"name": "coins", "url": "https://immunifanten.de/cdn/shop/files/coins.svg?v=1761661699&width=25", "context": "Geld-zurück-Versprechen"}
+    ],
+    "hero_imagery": [
+      "https://immunifanten.de/cdn/shop/files/Frame_18.png?v=1761710840&width=300",
+      "https://immunifanten.de/cdn/shop/files/Yves_Swiss_Design_Grunderbild_1.png?v=1761032287&width=300",
+      "https://immunifanten.de/cdn/shop/files/Image_15.png?v=1762419303&width=300"
+    ]
+  },
+
+  "spacing_and_radius": {
+    "base_unit": "4px (Tailwind-like Scale via rem)",
+    "page_width_max": "81.25rem (≈ 1300px)",
+    "section_spacing": {
+      "desktop": "64px",
+      "mobile": "45px"
+    },
+    "grid_spacing_desktop": {
+      "vertical": "32px",
+      "horizontal": "16px"
+    },
+    "spacing_scale": {
+      "xl": "6rem",
+      "lg": "4rem",
+      "md": "2rem",
+      "sm": "1rem",
+      "xs": "0.5rem",
+      "xxs": "0.25rem"
+    },
+    "border_radius": {
+      "inputs": "12px",
+      "primary_button": "8px",
+      "secondary_button": "8px",
+      "product_card": "16px"
+    },
+    "input_borders": {
+      "width": "1px",
+      "opacity": 0.55
+    },
+    "product_card_shadow": {
+      "horizontal_offset": "4px",
+      "vertical_offset": "4px",
+      "blur": "5px",
+      "spread": "4px",
+      "color_rgb": "0, 0, 0",
+      "opacity": 0.08
+    }
+  },
+
+  "components": {
+    "primary_button": {
+      "background": "#FF8F06",
+      "text_color": "#FFFFFF",
+      "border_radius": "8px",
+      "padding_y": "xs (0.5rem)",
+      "padding_x": "md (2rem)"
+    },
+    "secondary_button": {
+      "background": "#FFD39E",
+      "text_color": "#FFFFFF",
+      "border_radius": "8px"
+    },
+    "add_to_cart_button": {
+      "background": "#315014",
+      "text_color": "#FFFFFF",
+      "note": "Deutlich anderer (dunkelgrüner) Ton als Primary-Buttons. Signalisiert Hauptkonversion."
+    },
+    "bubble_badge": {
+      "background": "#FF8F06",
+      "text_color": "#FFFFFF",
+      "border_hover_color": "#3A3A3A"
+    }
+  },
+
+  "voice": {
+    "tone": "Warmherzig, alltagstauglich, leicht spielerisch. Sieht Eltern als Komplizen, nicht als Schüler.",
+    "perspective": "Sie-Form / Du-Form gemischt. Auf der Live-Seite wird häufiger 'dein Kind / deine Familie' verwendet — eher Du-zugewandt.",
+    "key_brand_lines": [
+      "Immunifanten - Vitamine neu gedacht",
+      "Mehr Kraft für kleine Abenteurer durch tägliche Einnahme",
+      "IMMUNIFANTEN: Naschen mit gutem Gewissen",
+      "Gesunde Vitamine in jeder Portion Spaß - perfekt für kleiner Genießer mit großem Appetit auf Abenteuer",
+      "Entstanden aus dem Wunsch nach einer alltagstauglichen Lösung",
+      "2500 Kunden sind bereits Teil der Immunifanten Community",
+      "Das sagen unsere glücklichen Kunden"
+    ],
+    "category_headers": [
+      "Immunsystem",
+      "Energie",
+      "Wachstum & Knochen",
+      "Kognitive Funktion",
+      "Zuckerfrei & Vegan"
+    ],
+    "value_props_above_fold": [
+      "Ab 29€ Versandkostenfrei",
+      "Bis 16:00 Uhr bestellt - morgen geliefert",
+      "4.90 / 5 Kundenbewertungen",
+      "100% Geld-zurück-Verprechen",
+      "Beste Qualität für ihre Kinder",
+      "Qualifizierter Support",
+      "Versandkostenfrei ab 50€"
+    ],
+    "product_description_samples": [
+      "Unsere Immunifanten sind Fruchtgummis für Kinder im Alter von 4 bis 11 Jahren. Ihr Erdbeer Geschmack hat die Herzen der Kinder erobert und das ganze ohne versteckten Zucker. Zwei kleine Elefanten am Tag sorgen für eine spielerische Routine und nehmen Eltern eine Last von den Schultern.",
+      "Die leckeren, zuckerfreien Erdbeer-Gummies sind mehr als nur ein spielerischer Snack: Sie bieten eine tägliche Rundum-Versorgung mit 12 wichtigen Vitaminen & Mineralstoffen. Mit nur 4 Gummis täglich für Kinder ab 4 Jahren legen sie eine Basis für das Immunsystem, Wachstum und Energie. Das ganze ohne Auseinandersetzungen, denn welches Kind verzichtet freiwillig auf leckere Fruchtgummis?",
+      "Vitamin C, Zink, Selen und Vitamin D unterstützen die normale Funktion des Immunsystems deines Kindes."
+    ],
+    "cta_inventory": [
+      "Zum Produkt",
+      "Mehr erfahren",
+      "Nährwertetabelle ansehen",
+      "In den Warenkorb",
+      "Weiterlesen"
+    ],
+    "voice_observations": {
+      "metaphors": "Elefanten als Brand-Maskottchen, 'kleine Abenteurer' für Kinder, 'spielerische Routine' für Einnahmeprozess",
+      "trust_signals": "Geld-zurück-Versprechen, 2500-Kunden-Community, 4.90/5-Bewertung, 'Qualifizierter Support'",
+      "emotional_hooks": "'Naschen mit gutem Gewissen' (Schuldgefühl auflösen), 'Last von den Schultern nehmen' (Elternentlastung), 'Mehr Kraft für kleine Abenteurer' (positive Visualisierung)",
+      "claim_discipline": "Health Claims werden korrekt EU-konform formuliert ('Vitamin D unterstützt die normale Funktion des Immunsystems'), keine krankheitsbezogenen Aussagen",
+      "inconsistencies_to_flag": [
+        "Tippfehler 'Geld-zurück-Verprechen' (fehlt 's')",
+        "Tippfehler 'perfekt für kleiner Genießer' (sollte 'kleine')",
+        "'Unser Ratgeber & Nagel Blog' — 'Nagel' ist offensichtlich ein Platzhalter/Fehler, kein Markenwort",
+        "Auf der Seite steht '4 Gummis täglich für Kinder ab 4 Jahren' — auf dem offiziellen Label sind es 2 Gummies pro Tagesdosis. Massive Diskrepanz, dringend prüfen.",
+        "Auf der Seite werden '12 Vitamine' beworben — das Label deklariert 20 Nährstoffe (16 Vitamine/Mineralstoffe mit NRV + Cholin + ALA + Calcium + Eisen). 'Zuckerfreie & Vegane Vitamin Gummies' im Titel ist konsistent."
+      ]
+    }
+  },
+
+  "design_system": {
+    "framework": "Shopify (custom theme, Dawn-basiert mit Pahlowmedia-Customizations)",
+    "color_scheme": "light",
+    "personality": "professional aber familiennah, medium-energy"
+  }
+}
