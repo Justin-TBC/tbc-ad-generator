@@ -56,6 +56,7 @@
     .chip-muted { background: #1c1c1f; color: #a1a1aa; border: 1px solid #2a2a2e; }
     .chip-success { background: #10b98120; color: #10b981; }
     .chip-blue { background: #1e3a5f; color: #60a5fa; }
+    .chip-danger { background: #f43f5e20; color: #f43f5e; }
     .modal-bg { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
     .dropzone { border: 2px dashed #2a2a2e; border-radius: 8px; padding: 2rem; text-align: center; color: #71717a; transition: all 0.15s; cursor: pointer; }
     .dropzone:hover, .dropzone.dragover { border-color: #f97316; color: #f97316; background: #f9731608; }
@@ -970,6 +971,19 @@
         </div>
       </div>
 
+      <!-- NOTION -->
+      <div class="card p-6 mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold text-zinc-100">Notion</h2>
+          <span class="chip"
+            :class="notionStatus==='ok' ? 'chip-success' : notionStatus==='error' ? 'chip-danger' : 'chip-muted'"
+            x-text="notionStatus==='ok' ? 'Notion connected' : notionStatus==='error' ? 'Notion offline' : 'Not loaded'"></span>
+        </div>
+        <p class="text-xs text-muted mb-3">Brand colors, do's &amp; don'ts, campaign angles and tone adjectives are loaded from Notion on startup.</p>
+        <div x-show="notionStatus==='error'" class="text-xs text-danger mb-3" x-text="'Error: ' + notionLastError"></div>
+        <button class="btn btn-secondary text-sm" @click="loadNotionConfig()">↻ Reload from Notion</button>
+      </div>
+
       <!-- ABOUT -->
       <div class="card p-6">
         <h2 class="text-base font-semibold text-zinc-100 mb-1">About</h2>
@@ -1012,6 +1026,8 @@ function app() {
     dragState: null,
     blobUrlCache: new Map(),
     refTab: 'competitor',
+    notionStatus: 'idle',   // 'idle' | 'ok' | 'error'
+    notionLastError: '',
 
     // ---- State: references, products ----
     references: [],
@@ -1286,6 +1302,9 @@ function app() {
         this.view = 'settings';
         this.notify('Configure your image generation backend in Settings.', 'error');
       }
+
+      // Load brand config from Notion (non-blocking, falls back silently)
+      this.loadNotionConfig();
     },
 
     resetModelEndpointsToDefaults() {
@@ -1295,6 +1314,123 @@ function app() {
         marketing_studio_image: 'marketing_studio_image', flux_2: 'flux_2', flux_kontext: 'flux_kontext',
       };
       localStorage.setItem('adgen.settings', JSON.stringify(this.settings));
+    },
+
+    // ============================================================
+    // NOTION BRAND CONFIG
+    // ============================================================
+    async loadNotionConfig() {
+      const COLORS_DB  = 'e89672fc-5876-4ea2-beb9-0057bdbd635a';
+      const DOSDONT_DB = 'b4aa4642-a589-4e59-91fd-9a7e6cdd14ef';
+      const ANGLES_DB  = 'a7aadeed-357b-4db1-9e05-ac89aa986932';
+      const VOICE_PAGE = '382d3fdbf3c4818fa4b2d80f0e6525e6';
+
+      // Notion fetch via local proxy (avoids CORS)
+      const nFetch = async (path, body = null) => {
+        const opts = { method: body !== null ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' } };
+        if (body !== null) opts.body = JSON.stringify(body);
+        const res = await fetch(`/notion${path}`, opts);
+        if (!res.ok) throw new Error(`Notion ${res.status} on ${path}`);
+        return res.json();
+      };
+
+      // Extract plain text from Notion rich_text array
+      const rt = (arr) => (arr || []).map(r => r.plain_text).join('').trim();
+
+      // Fetch all pages from a database (handles pagination)
+      const queryAll = async (dbId, filter = null) => {
+        const pages = [];
+        let cursor = undefined;
+        do {
+          const body = {};
+          if (filter) body.filter = filter;
+          if (cursor)  body.start_cursor = cursor;
+          const res = await nFetch(`/databases/${dbId}/query`, body);
+          pages.push(...(res.results || []));
+          cursor = res.has_more ? res.next_cursor : undefined;
+        } while (cursor);
+        return pages;
+      };
+
+      this.notionStatus = 'idle';
+      this.notionLastError = '';
+
+      try {
+        // ── Brand Colors ──────────────────────────────────────────
+        const colorPages = await queryAll(COLORS_DB);
+        const newColors = {};
+        for (const page of colorPages) {
+          const props = page.properties || {};
+          const name = rt(props['Color Name']?.title || props['Name']?.title || []);
+          const hex  = rt(props['Hex']?.rich_text   || props['Hex Value']?.rich_text || props['hex']?.rich_text || []);
+          if (!name || !hex.startsWith('#')) continue;
+          const key = name.toLowerCase().replace(/^tbc\s+/, '').trim().replace(/\s+/g, '_');
+          newColors[key] = hex;
+        }
+        if (Object.keys(newColors).length) Object.assign(this.brandKit.colors, newColors);
+
+        // ── Do's & Don'ts ─────────────────────────────────────────
+        const ddPages = await queryAll(DOSDONT_DB);
+        const dos = [], donts = [];
+        for (const page of ddPages) {
+          const props = page.properties || {};
+          const text = rt(props['Text']?.title || props['Name']?.title || props['Rule']?.title || []);
+          const type = props['Type']?.select?.name || rt(props['Type']?.rich_text || []);
+          if (!text) continue;
+          if (type === 'Do')                         dos.push(text);
+          else if (type === "Don't" || type === 'Dont') donts.push(text);
+        }
+        if (dos.length)   this.brandKit.doExamples   = dos;
+        if (donts.length) this.brandKit.dontExamples = donts;
+
+        // ── Campaign Angles ───────────────────────────────────────
+        const anglePages = await queryAll(ANGLES_DB, {
+          or: [
+            { property: 'Status', select: { equals: 'Active'  } },
+            { property: 'Status', select: { equals: 'Testing' } },
+          ],
+        });
+        const activeAngles = [], testingAngles = [];
+        for (const page of anglePages) {
+          const props = page.properties || {};
+          const name   = rt(props['Name']?.title || props['Angle']?.title || []);
+          const status = props['Status']?.select?.name || '';
+          if (!name) continue;
+          if (status === 'Active')  activeAngles.push(name);
+          else if (status === 'Testing') testingAngles.push(name + ' (testing)');
+        }
+        const allAngles = [...activeAngles, ...testingAngles];
+        if (allAngles.length) this.brandKit.angles = allAngles;
+
+        // ── Brand Voice page (blocks) ─────────────────────────────
+        const blocksRes = await nFetch(`/blocks/${VOICE_PAGE}/children`);
+        const toneAdj = [], copyEx = [];
+        let section = null;
+        for (const block of blocksRes.results || []) {
+          const btype = block.type;
+          if (['heading_1','heading_2','heading_3'].includes(btype)) {
+            const heading = rt(block[btype]?.rich_text || []).toLowerCase();
+            if      (heading.includes('tone adjective')) section = 'tone';
+            else if (heading.includes('copy example'))  section = 'copy';
+            else                                        section = null;
+          } else if (btype === 'bulleted_list_item' && section) {
+            const text = rt(block.bulleted_list_item?.rich_text || []);
+            if (text) {
+              if (section === 'tone') toneAdj.push(text);
+              else                   copyEx.push(text);
+            }
+          }
+        }
+        if (toneAdj.length) this.brandKit.toneAdjectives     = toneAdj;
+        if (copyEx.length)  this.brandKit.germanCopyExamples = copyEx;
+
+        this.notionStatus = 'ok';
+        console.log('[notion] Brand config loaded successfully');
+      } catch(e) {
+        this.notionStatus = 'error';
+        this.notionLastError = e.message;
+        console.warn('[notion] Failed to load brand config (using hardcoded defaults):', e.message);
+      }
     },
 
     loadSettings() {

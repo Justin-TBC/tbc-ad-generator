@@ -18,9 +18,12 @@ import urllib.request
 import urllib.error
 from urllib.parse import urlparse
 
-UPSTREAM_BASE = "https://mcp.higgsfield.ai"
-DEFAULT_PORT = int(os.environ.get("PORT", 8000))
-PROXY_PREFIX = "/api"
+UPSTREAM_BASE  = "https://mcp.higgsfield.ai"
+DEFAULT_PORT   = int(os.environ.get("PORT", 8000))
+PROXY_PREFIX   = "/api"
+NOTION_PREFIX  = "/notion"
+NOTION_BASE    = "https://api.notion.com/v1"
+NOTION_TOKEN   = os.environ.get("NOTION_TOKEN", "")
 
 # Header die unveraendert an Higgsfield weitergegeben werden
 PASS_THROUGH_REQUEST_HEADERS = {
@@ -76,35 +79,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     # --- Dispatch ---
+    def _is_api(self):
+        return self.path.startswith(PROXY_PREFIX + "/") or self.path == PROXY_PREFIX
+
+    def _is_notion(self):
+        return self.path.startswith(NOTION_PREFIX + "/") or self.path == NOTION_PREFIX
+
     def do_GET(self):
-        if self.path.startswith(PROXY_PREFIX + "/") or self.path == PROXY_PREFIX:
-            self._proxy()
-        else:
-            super().do_GET()
+        if self._is_api():     self._proxy()
+        elif self._is_notion(): self._notion_proxy()
+        else:                  super().do_GET()
 
     def do_POST(self):
-        if self.path.startswith(PROXY_PREFIX + "/") or self.path == PROXY_PREFIX:
-            self._proxy()
-        else:
-            self.send_error(404)
+        if self._is_api():     self._proxy()
+        elif self._is_notion(): self._notion_proxy()
+        else:                  self.send_error(404)
 
     def do_PUT(self):
-        if self.path.startswith(PROXY_PREFIX + "/") or self.path == PROXY_PREFIX:
-            self._proxy()
-        else:
-            self.send_error(404)
+        if self._is_api():     self._proxy()
+        elif self._is_notion(): self._notion_proxy()
+        else:                  self.send_error(404)
 
     def do_DELETE(self):
-        if self.path.startswith(PROXY_PREFIX + "/") or self.path == PROXY_PREFIX:
-            self._proxy()
-        else:
-            self.send_error(404)
+        if self._is_api():     self._proxy()
+        elif self._is_notion(): self._notion_proxy()
+        else:                  self.send_error(404)
 
     def do_PATCH(self):
-        if self.path.startswith(PROXY_PREFIX + "/") or self.path == PROXY_PREFIX:
-            self._proxy()
-        else:
-            self.send_error(404)
+        if self._is_api():     self._proxy()
+        elif self._is_notion(): self._notion_proxy()
+        else:                  self.send_error(404)
 
     # --- Proxy core ---
     def _proxy(self):
@@ -143,6 +147,37 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 f'{{"error":"proxy_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
+            )
+
+    # --- Notion proxy ---
+    def _notion_proxy(self):
+        notion_path = self.path[len(NOTION_PREFIX):] or "/"
+        url = NOTION_BASE + notion_path
+        method = self.command
+
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        body = self.rfile.read(length) if length else None
+
+        req = urllib.request.Request(url, data=body, method=method)
+        req.add_header("Authorization", f"Bearer {NOTION_TOKEN}")
+        req.add_header("Notion-Version", "2022-06-28")
+        req.add_header("Content-Type", "application/json")
+
+        sys.stderr.write(f"[notion] {method} {url}\n")
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                self._relay(resp.status, resp.getheaders(), resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read()
+            self._relay(e.code, e.headers.items(), body)
+        except urllib.error.URLError as e:
+            self.send_response(502)
+            self._add_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                f'{{"error":"notion_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
             )
 
     def _relay(self, status: int, headers, body: bytes):
