@@ -27,6 +27,9 @@ NOTION_TOKEN    = os.environ.get("NOTION_TOKEN", "")
 SHOPIFY_PREFIX  = "/shopify"
 SHOPIFY_DOMAIN  = os.environ.get("SHOPIFY_DOMAIN", "")
 SHOPIFY_TOKEN   = os.environ.get("SHOPIFY_TOKEN", "")
+META_PREFIX     = "/meta"
+META_BASE       = "https://graph.facebook.com/v21.0"
+META_TOKEN      = os.environ.get("META_ACCESS_TOKEN", "")
 
 # Header die unveraendert an Higgsfield weitergegeben werden
 PASS_THROUGH_REQUEST_HEADERS = {
@@ -91,34 +94,42 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _is_shopify(self):
         return self.path.startswith(SHOPIFY_PREFIX + "/") or self.path == SHOPIFY_PREFIX
 
+    def _is_meta(self):
+        return self.path.startswith(META_PREFIX + "/") or self.path == META_PREFIX
+
     def do_GET(self):
         if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
         elif self._is_shopify():self._shopify_proxy()
+        elif self._is_meta():   self._meta_proxy()
         else:                   super().do_GET()
 
     def do_POST(self):
         if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
         elif self._is_shopify():self._shopify_proxy()
+        elif self._is_meta():   self._meta_proxy()
         else:                   self.send_error(404)
 
     def do_PUT(self):
         if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
         elif self._is_shopify():self._shopify_proxy()
+        elif self._is_meta():   self._meta_proxy()
         else:                   self.send_error(404)
 
     def do_DELETE(self):
         if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
         elif self._is_shopify():self._shopify_proxy()
+        elif self._is_meta():   self._meta_proxy()
         else:                   self.send_error(404)
 
     def do_PATCH(self):
         if self._is_api():      self._proxy()
         elif self._is_notion(): self._notion_proxy()
         elif self._is_shopify():self._shopify_proxy()
+        elif self._is_meta():   self._meta_proxy()
         else:                   self.send_error(404)
 
     # --- Proxy core ---
@@ -195,6 +206,44 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 f'{{"error":"shopify_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
+            )
+
+    # --- Meta Ad Library proxy ---
+    def _meta_proxy(self):
+        if not META_TOKEN:
+            self.send_response(503)
+            self._add_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"META_ACCESS_TOKEN not set"}')
+            return
+        meta_path = self.path[len(META_PREFIX):] or "/"
+        # Append access_token as query param (Graph API standard)
+        sep = "&" if "?" in meta_path else "?"
+        url = f"{META_BASE}{meta_path}{sep}access_token={META_TOKEN}"
+        method = self.command
+
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        body = self.rfile.read(length) if length else None
+
+        req = urllib.request.Request(url, data=body, method=method)
+        req.add_header("Content-Type", "application/json")
+
+        sys.stderr.write(f"[meta] {method} {META_BASE}{meta_path}\n")
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                self._relay(resp.status, resp.getheaders(), resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read()
+            self._relay(e.code, e.headers.items(), body)
+        except urllib.error.URLError as e:
+            self.send_response(502)
+            self._add_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                f'{{"error":"meta_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
             )
 
     # --- Notion proxy ---
