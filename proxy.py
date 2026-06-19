@@ -193,6 +193,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req.add_header("Accept", "application/json")
 
         sys.stderr.write(f"[shopify] {method} {url}\n")
+        sys.stderr.write(f"[shopify-debug] domain present: {bool(SHOPIFY_DOMAIN)}, token present: {bool(SHOPIFY_TOKEN)}, token length: {len(SHOPIFY_TOKEN)}\n")
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
