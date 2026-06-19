@@ -592,13 +592,25 @@
         <h1 class="text-2xl font-semibold text-zinc-100">Products</h1>
         <button class="btn btn-primary" @click="openProductModal()">+ Add Product</button>
       </div>
-      <p class="text-sm text-muted mb-6">Product catalog used in generation. Select products in the Generate panel.</p>
+      <p class="text-sm text-muted mb-4">Product catalog used in generation. Select products in the Generate panel.</p>
+
+      <!-- Collection filter -->
+      <div x-show="products.length > 0" class="flex flex-wrap gap-2 mb-5">
+        <template x-for="col in ['All', 'Nassfutter', 'Trockenfutter', 'Snacks', 'Futterzusatz', 'Merch', 'Other']" :key="col">
+          <button class="chip cursor-pointer transition"
+            :class="productFilter === col ? 'chip-accent' : 'chip-muted'"
+            @click="productFilter = col"
+            x-text="col + (col === 'All' ? ' (' + products.length + ')' : ' (' + products.filter(p => p.category === col).length + ')')">
+          </button>
+        </template>
+      </div>
+
       <div x-show="products.length === 0" class="card p-12 text-center">
         <p class="text-muted mb-4">No products yet.</p>
         <button class="btn btn-primary" @click="openProductModal()">Add first product</button>
       </div>
       <div class="grid grid-cols-3 gap-4">
-        <template x-for="prod in products" :key="prod.id">
+        <template x-for="prod in products.filter(p => productFilter === 'All' || p.category === productFilter)" :key="prod.id">
           <div class="card overflow-hidden cursor-pointer hover:border-accent transition" @click="openProductModal(prod)">
             <div class="aspect-video bg-bg-elev relative">
               <template x-if="prod.images && prod.images.length">
@@ -1135,6 +1147,7 @@ function app() {
     notionLastError: '',
     shopifyStatus: 'idle',   // 'idle' | 'ok' | 'error'
     shopifyLastError: '',
+    productFilter: 'All',
     metaSearch: {
       query: '', country: 'DE', loading: false, results: [], error: '', hasMore: false, nextCursor: null,
     },
@@ -1552,15 +1565,7 @@ function app() {
       this.shopifyStatus = 'idle';
       this.shopifyLastError = '';
 
-      const mapCategory = (type) => {
-        const t = (type || '').toLowerCase();
-        if (t.includes('trocken') || t.includes('dry'))   return 'Dry Food';
-        if (t.includes('nass')    || t.includes('wet'))   return 'Wet Food';
-        if (t.includes('snack')   || t.includes('treat')) return 'Snacks & Treats';
-        if (t.includes('supplement'))                     return 'Supplements';
-        if (t.includes('bundle'))                         return 'Bundle';
-        return 'Other';
-      };
+      const TARGET_COLLECTIONS = ['Nassfutter', 'Trockenfutter', 'Snacks', 'Futterzusatz', 'Merch'];
 
       const detectFlavor = (title) => {
         const flavors = ['Lachs','Huhn','Rind','Thunfisch','Ente','Kaninchen','Pute'];
@@ -1572,7 +1577,6 @@ function app() {
 
       const sFetch = async (path) => {
         const res = await fetch(`/shopify${path}`);
-        // Always 200 from proxy — check for soft errors in body
         const data = await res.json();
         if (data.pablo_error === 'shopify_auth_failed') {
           this.shopifyStatus = 'error';
@@ -1581,70 +1585,93 @@ function app() {
           throw new Error('shopify_auth_failed');
         }
         if (data.pablo_error) throw new Error(data.pablo_error + (data.detail ? ': ' + data.detail : ''));
-        if (!res.ok) throw new Error(`Shopify ${res.status} on ${path}`);
         return data;
       };
 
+      const mergeProduct = (sp, collectionName) => {
+        const mappedId = 'shopify_' + sp.id;
+        const mapped = {
+          id: mappedId,
+          title: sp.title,
+          category: collectionName,
+          images: (sp.images || []).map(img => ({
+            id: String(img.id), url: img.src, name: img.alt || sp.title, blob: null,
+          })),
+          description: stripHtml(sp.body_html),
+          flavor: detectFlavor(sp.title),
+          ageRange: '',
+          keyIngredients: [],
+          nutritionNotes: '',
+          fromShopify: true,
+          shopifyCollection: collectionName,
+        };
+        const existingIdx = this.products.findIndex(p => p.id === mappedId);
+        if (existingIdx >= 0) {
+          if (this.products[existingIdx].fromShopify) {
+            const existingImages = this.products[existingIdx].images || [];
+            mapped.images = mapped.images.map(img => {
+              const prev = existingImages.find(e => e.id === img.id);
+              return prev?.blob ? { ...img, blob: prev.blob } : img;
+            });
+            this.products.splice(existingIdx, 1, mapped);
+          }
+        } else {
+          this.products.push(mapped);
+          if (!this.generateForm.productIds.includes(mappedId)) {
+            this.generateForm.productIds.push(mappedId);
+          }
+        }
+      };
+
       try {
-        // Fetch all products directly — works for both Admin and Storefront tokens
-        let shopifyProducts = [];
-        const productsData = await sFetch('/products.json?limit=250');
-        shopifyProducts = productsData.products || [];
+        // Fetch all collections (custom + smart) in parallel
+        const [customData, smartData] = await Promise.all([
+          sFetch('/custom_collections.json?limit=250').catch(() => ({ custom_collections: [] })),
+          sFetch('/smart_collections.json?limit=250').catch(() => ({ smart_collections: [] })),
+        ]);
+        const allCollections = [
+          ...(customData.custom_collections || []),
+          ...(smartData.smart_collections || []),
+        ];
 
-        // Filter out packs and map to app format
-        const filtered = shopifyProducts.filter(p =>
-          !p.title.toLowerCase().includes('pack')
-        );
+        // Find target collections by title (case-insensitive)
+        const matched = TARGET_COLLECTIONS.map(name =>
+          allCollections.find(c => c.title.toLowerCase() === name.toLowerCase())
+        ).filter(Boolean);
 
-        for (const sp of filtered) {
-          const mappedId = 'shopify_' + sp.id;
-          const mapped = {
-            id: mappedId,
-            title: sp.title,
-            category: mapCategory(sp.product_type),
-            images: (sp.images || []).map(img => ({
-              id: String(img.id),
-              url: img.src,
-              name: img.alt || sp.title,
-              blob: null,
-            })),
-            description: stripHtml(sp.body_html),
-            flavor: detectFlavor(sp.title),
-            ageRange: '',
-            keyIngredients: [],
-            nutritionNotes: '',
-            fromShopify: true,
-          };
-
-          // Merge: update existing Shopify product, skip manually added ones
-          const existingIdx = this.products.findIndex(p => p.id === mappedId);
-          if (existingIdx >= 0) {
-            if (this.products[existingIdx].fromShopify) {
-              // Preserve blobs already fetched this session
-              const existingImages = this.products[existingIdx].images || [];
-              mapped.images = mapped.images.map(img => {
-                const prev = existingImages.find(e => e.id === img.id);
-                return prev?.blob ? { ...img, blob: prev.blob } : img;
-              });
-              this.products.splice(existingIdx, 1, mapped);
-            }
-          } else {
-            this.products.push(mapped);
-            if (!this.generateForm.productIds.includes(mappedId)) {
-              this.generateForm.productIds.push(mappedId);
+        if (matched.length === 0) {
+          // Fallback: load all products if no target collections found
+          console.warn('[shopify] Target collections not found, falling back to all products');
+          const data = await sFetch('/products.json?limit=250');
+          for (const sp of (data.products || [])) mergeProduct(sp, 'Other');
+        } else {
+          // Fetch products for each matched collection in parallel
+          const seen = new Set();
+          const results = await Promise.all(
+            matched.map(col => sFetch(`/collections/${col.id}/products.json?limit=250`)
+              .then(d => ({ col, products: d.products || [] }))
+              .catch(() => ({ col, products: [] }))
+            )
+          );
+          // Merge in TARGET_COLLECTIONS order so category assignment is deterministic
+          for (const { col, products } of results) {
+            for (const sp of products) {
+              if (seen.has(sp.id)) continue;
+              seen.add(sp.id);
+              mergeProduct(sp, col.title);
             }
           }
         }
 
         this.shopifyStatus = 'ok';
-        console.log(`[shopify] Synced ${filtered.length} products`);
+        const synced = this.products.filter(p => p.fromShopify).length;
+        console.log(`[shopify] Synced ${synced} products across ${matched.length} collections`);
       } catch(e) {
-        // Don't overwrite auth-specific error already set by sFetch
         if (e.message !== 'shopify_auth_failed') {
           this.shopifyStatus = 'error';
           this.shopifyLastError = e.message;
         }
-        console.warn('[shopify] Sync failed (using existing products):', e.message);
+        console.warn('[shopify] Sync failed:', e.message);
       }
     },
 
