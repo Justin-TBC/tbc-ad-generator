@@ -1065,7 +1065,11 @@
         </div>
         <p class="text-xs text-muted mb-3">Products are synced automatically from your Shopify store on startup.</p>
         <div x-show="shopifyStatus==='error'" class="text-xs text-danger mb-3" x-text="'Error: ' + shopifyLastError"></div>
-        <button class="btn btn-secondary text-sm" @click="loadShopifyProducts()">↻ Reload from Shopify</button>
+        <div class="flex gap-2 flex-wrap">
+          <button class="btn btn-secondary text-sm" @click="loadShopifyProducts()">↻ Reload from Shopify</button>
+          <a href="/shopify-auth/start" target="_blank" class="btn btn-secondary text-sm">🔑 Get Shopify Token</a>
+        </div>
+        <p class="text-xs text-muted mt-2">No token yet? Click "Get Shopify Token" — it opens a one-time setup page. Add <code class="text-zinc-400">SHOPIFY_CLIENT_ID</code> and <code class="text-zinc-400">SHOPIFY_CLIENT_SECRET</code> from your Partners dashboard to Railway first.</p>
       </div>
 
       <!-- META AD LIBRARY -->

@@ -24,11 +24,14 @@ PROXY_PREFIX   = "/api"
 NOTION_PREFIX   = "/notion"
 NOTION_BASE     = "https://api.notion.com/v1"
 NOTION_TOKEN    = os.environ.get("NOTION_TOKEN", "")
-SHOPIFY_PREFIX  = "/shopify"
-SHOPIFY_DOMAIN  = os.environ.get("SHOPIFY_DOMAIN", "")
-SHOPIFY_TOKEN   = os.environ.get("SHOPIFY_TOKEN", "").strip()
-# shpat_ = Admin API token, shpss_/other = treat as Storefront token
-SHOPIFY_IS_STOREFRONT = not SHOPIFY_TOKEN.startswith("shpat_")
+SHOPIFY_PREFIX      = "/shopify"
+SHOPIFY_AUTH_PREFIX = "/shopify-auth"
+SHOPIFY_DOMAIN      = os.environ.get("SHOPIFY_DOMAIN", "")
+SHOPIFY_TOKEN       = os.environ.get("SHOPIFY_TOKEN", "").strip()
+SHOPIFY_CLIENT_ID   = os.environ.get("SHOPIFY_CLIENT_ID", "").strip()
+SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip()
+# shpat_ = Admin API token; anything else = Storefront token
+SHOPIFY_IS_STOREFRONT = bool(SHOPIFY_TOKEN) and not SHOPIFY_TOKEN.startswith("shpat_")
 META_PREFIX     = "/meta"
 META_BASE       = "https://graph.facebook.com/v21.0"
 META_TOKEN      = os.environ.get("META_ACCESS_TOKEN", "")
@@ -96,15 +99,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _is_shopify(self):
         return self.path.startswith(SHOPIFY_PREFIX + "/") or self.path == SHOPIFY_PREFIX
 
+    def _is_shopify_auth(self):
+        return self.path.startswith(SHOPIFY_AUTH_PREFIX + "/") or self.path == SHOPIFY_AUTH_PREFIX
+
     def _is_meta(self):
         return self.path.startswith(META_PREFIX + "/") or self.path == META_PREFIX
 
     def do_GET(self):
-        if self._is_api():      self._proxy()
-        elif self._is_notion(): self._notion_proxy()
-        elif self._is_shopify():self._shopify_proxy()
-        elif self._is_meta():   self._meta_proxy()
-        else:                   super().do_GET()
+        if self._is_api():           self._proxy()
+        elif self._is_notion():      self._notion_proxy()
+        elif self._is_shopify_auth():self._shopify_auth()
+        elif self._is_shopify():     self._shopify_proxy()
+        elif self._is_meta():        self._meta_proxy()
+        else:                        super().do_GET()
 
     def do_POST(self):
         if self._is_api():      self._proxy()
@@ -172,6 +179,104 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(
                 f'{{"error":"proxy_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
             )
+
+    # --- Shopify OAuth helper (one-time token setup) ---
+    def _shopify_auth(self):
+        import json as _json
+        from urllib.parse import urlparse, parse_qs, urlencode, quote
+
+        sub = self.path[len(SHOPIFY_AUTH_PREFIX):]  # e.g. "/start" or "/callback"
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+
+        def html_page(title, body):
+            page = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>{title}</title>
+<style>body{{font-family:system-ui,sans-serif;background:#0a0a0b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}}
+.box{{background:#141416;border:1px solid #2a2a2e;border-radius:12px;padding:2rem;max-width:560px;width:100%}}
+h2{{margin:0 0 1rem;color:#fff}}p{{color:#a1a1aa;font-size:.9rem;line-height:1.6}}
+code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-radius:4px;font-size:.85rem;word-break:break-all}}
+.btn{{display:inline-block;margin-top:1rem;padding:.6rem 1.2rem;background:#f97316;color:#1a0f04;border-radius:8px;text-decoration:none;font-weight:600;cursor:pointer;border:none;font-size:.9rem}}
+.ok{{color:#10b981}}.err{{color:#f43f5e}}
+</style></head><body><div class="box">{body}</div></body></html>"""
+            data = page.encode()
+            self.send_response(200)
+            self._add_cors()
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        # ── /shopify-auth/start ──────────────────────────────────
+        if sub.startswith("/start"):
+            if not SHOPIFY_CLIENT_ID or not SHOPIFY_DOMAIN:
+                html_page("Setup needed", "<h2>Setup needed</h2><p>Set <code>SHOPIFY_CLIENT_ID</code> and <code>SHOPIFY_DOMAIN</code> in Railway environment variables first.</p>")
+                return
+            redirect_uri = f"{self._origin()}/shopify-auth/callback"
+            scope = "read_products,read_collections,read_inventory"
+            auth_url = (f"https://{SHOPIFY_DOMAIN}/admin/oauth/authorize"
+                        f"?client_id={SHOPIFY_CLIENT_ID}"
+                        f"&scope={scope}"
+                        f"&redirect_uri={quote(redirect_uri, safe='')}"
+                        f"&grant_options[]=offline")
+            self.send_response(302)
+            self._add_cors()
+            self.send_header("Location", auth_url)
+            self.end_headers()
+            return
+
+        # ── /shopify-auth/callback ───────────────────────────────
+        if sub.startswith("/callback"):
+            code = qs.get("code", [None])[0]
+            shop = qs.get("shop", [SHOPIFY_DOMAIN])[0]
+            error = qs.get("error", [None])[0]
+
+            if error:
+                html_page("Auth failed", f"<h2 class='err'>Auth failed</h2><p>{error}</p>")
+                return
+            if not code:
+                html_page("No code", "<h2 class='err'>No code returned</h2><p>Try starting the flow again.</p>")
+                return
+            if not SHOPIFY_CLIENT_SECRET:
+                html_page("Missing secret", "<h2 class='err'>SHOPIFY_CLIENT_SECRET not set</h2><p>Add it to Railway environment variables.</p>")
+                return
+
+            # Exchange code for access token
+            try:
+                payload = _json.dumps({
+                    "client_id": SHOPIFY_CLIENT_ID,
+                    "client_secret": SHOPIFY_CLIENT_SECRET,
+                    "code": code,
+                }).encode()
+                req = urllib.request.Request(
+                    f"https://{shop}/admin/oauth/access_token",
+                    data=payload, method="POST",
+                )
+                req.add_header("Content-Type", "application/json")
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    token_data = _json.loads(resp.read())
+                access_token = token_data.get("access_token", "")
+                scope = token_data.get("scope", "")
+                if not access_token:
+                    raise ValueError("No access_token in response: " + str(token_data))
+                sys.stderr.write(f"[shopify-auth] token obtained, scope={scope}\n")
+                html_page("Connected!", f"""
+<h2 class='ok'>✓ Shopify connected!</h2>
+<p>Your Admin API access token:</p>
+<code>{access_token}</code>
+<p style='margin-top:1rem'>Copy this token and set it as <code>SHOPIFY_TOKEN</code> in your Railway environment variables, then redeploy.</p>
+<p style='color:#71717a;font-size:.8rem'>Scopes granted: {scope}</p>""")
+            except Exception as e:
+                sys.stderr.write(f"[shopify-auth] token exchange failed: {e}\n")
+                html_page("Token exchange failed", f"<h2 class='err'>Token exchange failed</h2><p>{str(e)}</p>")
+            return
+
+        html_page("Not found", "<h2>Not found</h2>")
+
+    def _origin(self):
+        host = self.headers.get("Host", "localhost")
+        proto = "https" if "railway" in host or "." in host.split(":")[0] else "http"
+        return f"{proto}://{host}"
 
     # --- Shopify proxy ---
     def _shopify_proxy(self):
