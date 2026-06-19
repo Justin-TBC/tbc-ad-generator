@@ -190,6 +190,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req = urllib.request.Request(url, data=body, method=method)
         req.add_header("X-Shopify-Access-Token", SHOPIFY_TOKEN)
         req.add_header("Content-Type", "application/json")
+        req.add_header("Accept", "application/json")
 
         sys.stderr.write(f"[shopify] {method} {url}\n")
 
@@ -261,8 +262,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req.add_header("Content-Type", "application/json")
 
         sys.stderr.write(f"[notion] {method} {url}\n")
-        sys.stderr.write(f"[notion-token] token present: {bool(os.environ.get('NOTION_TOKEN'))}, length: {len(os.environ.get('NOTION_TOKEN', ''))}\n")
-        sys.stderr.write(f"[notion-auth] Authorization: {req.get_header('Authorization')}\n")
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:

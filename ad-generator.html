@@ -1061,7 +1061,7 @@
           <h2 class="text-base font-semibold text-zinc-100">Shopify</h2>
           <span class="chip"
             :class="shopifyStatus==='ok' ? 'chip-success' : shopifyStatus==='error' ? 'chip-danger' : 'chip-muted'"
-            x-text="shopifyStatus==='ok' ? 'Shopify synced' : shopifyStatus==='error' ? 'Shopify offline' : 'Not loaded'"></span>
+            x-text="shopifyStatus==='ok' ? 'Shopify synced · ' + products.filter(p=>p.fromShopify).length + ' products' : shopifyStatus==='error' ? 'Shopify offline' : 'Not loaded'"></span>
         </div>
         <p class="text-xs text-muted mb-3">Products are synced automatically from your Shopify store on startup.</p>
         <div x-show="shopifyStatus==='error'" class="text-xs text-danger mb-3" x-text="'Error: ' + shopifyLastError"></div>
@@ -1604,14 +1604,15 @@ function app() {
         );
 
         for (const sp of filtered) {
+          const mappedId = 'shopify_' + sp.id;
           const mapped = {
-            id: String(sp.id),
+            id: mappedId,
             title: sp.title,
             category: mapCategory(sp.product_type),
             images: (sp.images || []).map(img => ({
               id: String(img.id),
               url: img.src,
-              name: sp.title,
+              name: img.alt || sp.title,
               blob: null,
             })),
             description: stripHtml(sp.body_html),
@@ -1623,10 +1624,10 @@ function app() {
           };
 
           // Merge: update existing Shopify product, skip manually added ones
-          const existingIdx = this.products.findIndex(p => String(p.id) === String(sp.id));
+          const existingIdx = this.products.findIndex(p => p.id === mappedId);
           if (existingIdx >= 0) {
             if (this.products[existingIdx].fromShopify) {
-              // Preserve any blobs already fetched
+              // Preserve blobs already fetched this session
               const existingImages = this.products[existingIdx].images || [];
               mapped.images = mapped.images.map(img => {
                 const prev = existingImages.find(e => e.id === img.id);
@@ -1636,9 +1637,8 @@ function app() {
             }
           } else {
             this.products.push(mapped);
-            // Auto-select newly synced products
-            if (!this.generateForm.productIds.includes(mapped.id)) {
-              this.generateForm.productIds.push(mapped.id);
+            if (!this.generateForm.productIds.includes(mappedId)) {
+              this.generateForm.productIds.push(mappedId);
             }
           }
         }
@@ -1917,6 +1917,8 @@ function app() {
             this.auth.userInfo = { email: payload.email, name: payload.name, sub: payload.sub };
           } catch(e) {}
         }
+        // Persist refresh token under dedicated key for resilience
+        if (tok.refresh_token) localStorage.setItem('hf_refresh_token', tok.refresh_token);
         this.saveAuth();
         history.replaceState({}, '', window.location.pathname);
         sessionStorage.removeItem('adgen.pkce_verifier');
@@ -2173,6 +2175,19 @@ function app() {
     // ============================================================
     async mcpCall(toolName, toolArgs) {
       if (!this.auth.accessToken) throw new Error('Not logged in. Please sign in with Higgsfield first.');
+      try {
+        return await this._mcpCallOnce(toolName, toolArgs);
+      } catch(e) {
+        // On 401 / unauthorized, attempt token refresh then retry once
+        if (/401|unauthorized/i.test(e.message)) {
+          const refreshed = await this.refreshHiggsfieldToken();
+          if (refreshed) return await this._mcpCallOnce(toolName, toolArgs);
+        }
+        throw e;
+      }
+    },
+
+    async _mcpCallOnce(toolName, toolArgs) {
       const reqBody = { jsonrpc:'2.0', id:Date.now(), method:'tools/call', params:{ name:toolName, arguments:toolArgs } };
       let res;
       try {
@@ -2193,6 +2208,39 @@ function app() {
       if (parsed.error) throw new Error(`MCP error ${parsed.error.code} at ${toolName}: ${parsed.error.message}`);
       const result = parsed.result || {};
       return result.structuredContent || result;
+    },
+
+    async refreshHiggsfieldToken() {
+      const refreshToken = this.auth.refreshToken || localStorage.getItem('hf_refresh_token') || '';
+      if (!refreshToken || !this.auth.clientId) return false;
+      console.log('[oauth] attempting token refresh');
+      try {
+        const r = await fetch(this.OAUTH_TOKEN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+            client_id: this.auth.clientId,
+          }),
+        });
+        if (!r.ok) throw new Error(`Refresh ${r.status}: ${(await r.text()).slice(0,200)}`);
+        const tok = await r.json();
+        this.auth.accessToken = tok.access_token;
+        if (tok.refresh_token) this.auth.refreshToken = tok.refresh_token;
+        this.auth.tokenExpiresAt = Date.now() + (tok.expires_in || 3600) * 1000;
+        this.saveAuth();
+        this.notify('Session renewed.');
+        console.log('[oauth] token refreshed successfully');
+        return true;
+      } catch(e) {
+        console.warn('[oauth] token refresh failed:', e.message);
+        const keepId = this.auth.clientId;
+        this.auth = { clientId: keepId, accessToken: '', refreshToken: '', tokenExpiresAt: 0, userInfo: null };
+        this.saveAuth();
+        this.notify('Higgsfield session expired — please sign in again.', 'error');
+        return false;
+      }
     },
 
     async hfUploadImage(blob) {
