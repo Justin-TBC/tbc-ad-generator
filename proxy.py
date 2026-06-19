@@ -199,6 +199,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             with urllib.request.urlopen(req, timeout=30) as resp:
                 status = resp.status
                 raw = resp.read()
+                sys.stderr.write(f"[shopify-status] {method} {shopify_path} → {status}\n")
                 if status in (401, 407):
                     error_body = b'{"pablo_error":"shopify_auth_failed","status":' + str(status).encode() + b'}'
                     self._relay(200, [], error_body)
@@ -207,6 +208,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except urllib.error.HTTPError as e:
             status = e.code
             raw = e.read()
+            sys.stderr.write(f"[shopify-status] {method} {shopify_path} → {status} (HTTPError) body={raw[:200]}\n")
             if status in (401, 407):
                 error_body = b'{"pablo_error":"shopify_auth_failed","status":' + str(status).encode() + b'}'
                 self._relay(200, [], error_body)
