@@ -196,17 +196,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                self._relay(resp.status, resp.getheaders(), resp.read())
+                status = resp.status
+                raw = resp.read()
+                if status in (401, 407):
+                    error_body = b'{"pablo_error":"shopify_auth_failed","status":' + str(status).encode() + b'}'
+                    self._relay(200, [], error_body)
+                else:
+                    self._relay(status, resp.getheaders(), raw)
         except urllib.error.HTTPError as e:
-            body = e.read()
-            self._relay(e.code, e.headers.items(), body)
+            status = e.code
+            raw = e.read()
+            if status in (401, 407):
+                error_body = b'{"pablo_error":"shopify_auth_failed","status":' + str(status).encode() + b'}'
+                self._relay(200, [], error_body)
+            else:
+                self._relay(status, e.headers.items(), raw)
         except urllib.error.URLError as e:
-            self.send_response(502)
+            self.send_response(200)
             self._add_cors()
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(
-                f'{{"error":"shopify_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
+                f'{{"pablo_error":"shopify_network_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
             )
 
     # --- Meta Ad Library proxy ---

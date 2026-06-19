@@ -1568,8 +1568,17 @@ function app() {
 
       const sFetch = async (path) => {
         const res = await fetch(`/shopify${path}`);
+        // Always 200 from proxy — check for soft errors in body
+        const data = await res.json();
+        if (data.pablo_error === 'shopify_auth_failed') {
+          this.shopifyStatus = 'error';
+          this.shopifyLastError = 'Shopify token invalid — check Railway variables';
+          this.notify('Shopify token invalid — check Railway variables', 'error');
+          throw new Error('shopify_auth_failed');
+        }
+        if (data.pablo_error) throw new Error(data.pablo_error + (data.detail ? ': ' + data.detail : ''));
         if (!res.ok) throw new Error(`Shopify ${res.status} on ${path}`);
-        return res.json();
+        return data;
       };
 
       try {
@@ -1646,8 +1655,11 @@ function app() {
         this.shopifyStatus = 'ok';
         console.log(`[shopify] Synced ${filtered.length} products`);
       } catch(e) {
-        this.shopifyStatus = 'error';
-        this.shopifyLastError = e.message;
+        // Don't overwrite auth-specific error already set by sFetch
+        if (e.message !== 'shopify_auth_failed') {
+          this.shopifyStatus = 'error';
+          this.shopifyLastError = e.message;
+        }
         console.warn('[shopify] Sync failed (using existing products):', e.message);
       }
     },
