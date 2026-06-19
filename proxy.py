@@ -27,6 +27,8 @@ NOTION_TOKEN    = os.environ.get("NOTION_TOKEN", "")
 SHOPIFY_PREFIX  = "/shopify"
 SHOPIFY_DOMAIN  = os.environ.get("SHOPIFY_DOMAIN", "")
 SHOPIFY_TOKEN   = os.environ.get("SHOPIFY_TOKEN", "").strip()
+# shpat_ = Admin API token, shpss_/other = treat as Storefront token
+SHOPIFY_IS_STOREFRONT = not SHOPIFY_TOKEN.startswith("shpat_")
 META_PREFIX     = "/meta"
 META_BASE       = "https://graph.facebook.com/v21.0"
 META_TOKEN      = os.environ.get("META_ACCESS_TOKEN", "")
@@ -181,14 +183,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(b'{"error":"SHOPIFY_DOMAIN not set"}')
             return
         shopify_path = self.path[len(SHOPIFY_PREFIX):] or "/"
-        url = f"https://{SHOPIFY_DOMAIN}/admin/api/2024-01{shopify_path}"
+        if SHOPIFY_IS_STOREFRONT:
+            # Storefront API: public REST endpoints, no /admin prefix
+            url = f"https://{SHOPIFY_DOMAIN}/api/2024-01{shopify_path}"
+        else:
+            url = f"https://{SHOPIFY_DOMAIN}/admin/api/2024-01{shopify_path}"
         method = self.command
 
         length = int(self.headers.get("Content-Length", "0") or "0")
         body = self.rfile.read(length) if length else None
 
         req = urllib.request.Request(url, data=body, method=method)
-        req.add_header("X-Shopify-Access-Token", SHOPIFY_TOKEN)
+        if SHOPIFY_IS_STOREFRONT:
+            req.add_header("X-Shopify-Storefront-Access-Token", SHOPIFY_TOKEN)
+        else:
+            req.add_header("X-Shopify-Access-Token", SHOPIFY_TOKEN)
         req.add_header("Content-Type", "application/json")
         req.add_header("Accept", "application/json")
 

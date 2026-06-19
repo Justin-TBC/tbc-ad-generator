@@ -1582,30 +1582,10 @@ function app() {
       };
 
       try {
-        // Find the target collection (try custom, then smart)
-        let collectionId = null;
-        const [customData, smartData] = await Promise.all([
-          sFetch('/custom_collections.json?limit=250').catch(() => ({ custom_collections: [] })),
-          sFetch('/smart_collections.json?limit=250').catch(() => ({ smart_collections: [] })),
-        ]);
-        const allCollections = [
-          ...(customData.custom_collections || []),
-          ...(smartData.smart_collections || []),
-        ];
-        const target = allCollections.find(c =>
-          c.title === 'Our Store' || c.handle === 'frontpage' || c.handle === 'all'
-        ) || allCollections[0];
-        if (target) collectionId = target.id;
-
-        // Fetch products
+        // Fetch all products directly — works for both Admin and Storefront tokens
         let shopifyProducts = [];
-        if (collectionId) {
-          const data = await sFetch(`/collections/${collectionId}/products.json?limit=250`);
-          shopifyProducts = data.products || [];
-        } else {
-          const data = await sFetch('/products.json?limit=250');
-          shopifyProducts = data.products || [];
-        }
+        const productsData = await sFetch('/products.json?limit=250');
+        shopifyProducts = productsData.products || [];
 
         // Filter out packs and map to app format
         const filtered = shopifyProducts.filter(p =>
