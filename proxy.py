@@ -219,10 +219,14 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
                         f"&scope={scope}"
                         f"&redirect_uri={quote(redirect_uri, safe='')}"
                         f"&grant_options[]=offline")
-            self.send_response(302)
-            self._add_cors()
-            self.send_header("Location", auth_url)
-            self.end_headers()
+            sys.stderr.write(f"[shopify-auth] redirect_uri={redirect_uri}\n")
+            sys.stderr.write(f"[shopify-auth] auth_url={auth_url}\n")
+            html_page("Connect Shopify", f"""
+<h2>Connect Shopify</h2>
+<p>Your redirect URI — copy this <strong>exactly</strong> into Partners dashboard → your app → App setup → <strong>Allowed redirection URL(s)</strong>:</p>
+<code>{redirect_uri}</code>
+<p style="margin-top:1.5rem">Once that's saved in Partners dashboard, click below to authorize:</p>
+<a href="{auth_url}" class="btn">Authorize in Shopify →</a>""")
             return
 
         # ── /shopify-auth/callback ───────────────────────────────
