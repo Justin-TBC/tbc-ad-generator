@@ -26,7 +26,7 @@ NOTION_BASE     = "https://api.notion.com/v1"
 NOTION_TOKEN    = os.environ.get("NOTION_TOKEN", "")
 SHOPIFY_PREFIX  = "/shopify"
 SHOPIFY_DOMAIN  = os.environ.get("SHOPIFY_DOMAIN", "")
-SHOPIFY_TOKEN   = os.environ.get("SHOPIFY_TOKEN", "")
+SHOPIFY_TOKEN   = os.environ.get("SHOPIFY_TOKEN", "").strip()
 META_PREFIX     = "/meta"
 META_BASE       = "https://graph.facebook.com/v21.0"
 META_TOKEN      = os.environ.get("META_ACCESS_TOKEN", "")
@@ -193,7 +193,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req.add_header("Accept", "application/json")
 
         sys.stderr.write(f"[shopify] {method} {url}\n")
-        sys.stderr.write(f"[shopify-debug] domain present: {bool(SHOPIFY_DOMAIN)}, token present: {bool(SHOPIFY_TOKEN)}, token length: {len(SHOPIFY_TOKEN)}\n")
+        sys.stderr.write(f"[shopify-debug] domain present: {bool(SHOPIFY_DOMAIN)}, token present: {bool(SHOPIFY_TOKEN)}, token length: {len(SHOPIFY_TOKEN)}, token prefix: {SHOPIFY_TOKEN[:6]!r}\n")
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
