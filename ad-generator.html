@@ -127,30 +127,58 @@
             </select>
           </div>
 
-          <!-- Product picker -->
-          <div>
+          <!-- Product picker (compact dropdown) -->
+          <div x-data="{ open: false }" @click.outside="open = false">
             <label class="label">Products</label>
             <div x-show="products.length === 0" class="text-xs text-danger">
               No products yet. <button class="underline" @click="view='products'">Add products</button>
             </div>
-            <div x-show="products.length > 0" class="grid grid-cols-2 gap-2">
-              <template x-for="prod in products" :key="prod.id">
-                <div class="card p-2 cursor-pointer ring-2 transition flex items-center gap-2"
-                  :class="generateForm.productIds.includes(prod.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
-                  @click="toggleProductId(prod.id)">
-                  <template x-if="prod.images && prod.images.length">
-                    <img :src="imgSrc(prod.images[0])" class="w-10 h-10 rounded object-cover bg-bg-elev flex-shrink-0">
+            <div x-show="products.length > 0">
+              <!-- Trigger button -->
+              <button type="button" class="input text-left flex items-center justify-between cursor-pointer"
+                @click="open = !open">
+                <span class="text-sm" :class="generateForm.productIds.length ? 'text-zinc-100' : 'text-muted'"
+                  x-text="generateForm.productIds.length ? generateForm.productIds.length + ' product' + (generateForm.productIds.length > 1 ? 's' : '') + ' selected' : 'Select products…'">
+                </span>
+                <svg class="w-4 h-4 text-muted flex-shrink-0 transition" :class="open ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <!-- Dropdown panel -->
+              <div x-show="open" x-transition.opacity class="mt-1 card overflow-hidden max-h-72 overflow-y-auto z-10 relative">
+                <!-- Group by collection -->
+                <template x-for="col in ['Nassfutter','Trockenfutter','Snacks','Futterzusatz','Merch','Other']" :key="col">
+                  <template x-if="products.filter(p => p.category === col).length > 0">
+                    <div>
+                      <div class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted bg-bg-elev border-b border-bg-border" x-text="col"></div>
+                      <template x-for="prod in products.filter(p => p.category === col)" :key="prod.id">
+                        <div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-elev transition border-b border-bg-border last:border-0"
+                          :class="generateForm.productIds.includes(prod.id) ? 'bg-accent/5' : ''"
+                          @click.stop="toggleProductId(prod.id)">
+                          <div class="w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition"
+                            :class="generateForm.productIds.includes(prod.id) ? 'bg-accent border-accent' : 'border-bg-border'">
+                            <svg x-show="generateForm.productIds.includes(prod.id)" class="w-3 h-3 text-bg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                          </div>
+                          <template x-if="prod.images && prod.images.length">
+                            <img :src="imgSrc(prod.images[0])" class="w-7 h-7 rounded object-cover bg-bg-elev flex-shrink-0">
+                          </template>
+                          <span class="text-sm text-zinc-100 truncate flex-1" x-text="prod.title"></span>
+                          <span x-show="prod.flavor" class="text-xs text-muted flex-shrink-0" x-text="prod.flavor"></span>
+                        </div>
+                      </template>
+                    </div>
                   </template>
-                  <template x-if="!prod.images || !prod.images.length">
-                    <div class="w-10 h-10 rounded bg-bg-elev flex-shrink-0 flex items-center justify-center text-muted text-xs">?</div>
+                </template>
+              </div>
+              <!-- Selected chips -->
+              <div x-show="generateForm.productIds.length > 0" class="flex flex-wrap gap-1 mt-2">
+                <template x-for="id in generateForm.productIds" :key="id">
+                  <template x-if="products.find(p => p.id === id)">
+                    <span class="chip chip-accent text-xs flex items-center gap-1">
+                      <span x-text="products.find(p => p.id === id)?.title?.slice(0,20)"></span>
+                      <button class="hover:opacity-70" @click.stop="generateForm.productIds = generateForm.productIds.filter(x => x !== id)">✕</button>
+                    </span>
                   </template>
-                  <div class="min-w-0 flex-1">
-                    <div class="text-xs font-medium text-zinc-100 truncate" x-text="prod.title"></div>
-                    <span class="chip chip-muted text-xs" style="font-size:0.65rem" x-text="prod.category"></span>
-                  </div>
-                  <div x-show="generateForm.productIds.includes(prod.id)" class="w-4 h-4 rounded-full bg-accent text-bg flex items-center justify-center text-xs flex-shrink-0">✓</div>
-                </div>
-              </template>
+                </template>
+              </div>
             </div>
           </div>
 
@@ -1617,9 +1645,6 @@ function app() {
           }
         } else {
           this.products.push(mapped);
-          if (!this.generateForm.productIds.includes(mappedId)) {
-            this.generateForm.productIds.push(mappedId);
-          }
         }
       };
 
@@ -1657,6 +1682,8 @@ function app() {
           for (const { col, products } of results) {
             for (const sp of products) {
               if (seen.has(sp.id)) continue;
+              // Skip HIVE products (inventory placeholders)
+              if (sp.title.toUpperCase().includes('HIVE')) continue;
               seen.add(sp.id);
               mergeProduct(sp, col.title);
             }
@@ -2116,10 +2143,6 @@ function app() {
         if (idx >= 0) this.products.splice(idx, 1, p); else this.products.push(p);
       } else {
         this.products.push(p);
-        // Auto-select newly added products for generation
-        if (!this.generateForm.productIds.includes(p.id)) {
-          this.generateForm.productIds.push(p.id);
-        }
       }
       this.closeProductModal();
       this.notify('Product saved.');
