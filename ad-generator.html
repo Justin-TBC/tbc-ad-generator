@@ -2271,8 +2271,11 @@ function app() {
     },
 
     async refreshHiggsfieldToken() {
+      // Guard: prevent concurrent refresh calls (refresh tokens are single-use)
+      if (this._refreshInProgress) return false;
+      this._refreshInProgress = true;
       const refreshToken = this.auth.refreshToken || localStorage.getItem('hf_refresh_token') || '';
-      if (!refreshToken || !this.auth.clientId) return false;
+      if (!refreshToken || !this.auth.clientId) { this._refreshInProgress = false; return false; }
       console.log('[oauth] attempting token refresh');
       try {
         const r = await fetch(this.OAUTH_TOKEN, {
@@ -2292,8 +2295,10 @@ function app() {
         if (tok.refresh_token) this.auth.refreshToken = tok.refresh_token;
         this.auth.tokenExpiresAt = Date.now() + (tok.expires_in || 3600) * 1000;
         this.saveAuth();
+        if (tok.refresh_token) localStorage.setItem('hf_refresh_token', tok.refresh_token);
         this.notify('Session renewed.');
         console.log('[oauth] token refreshed successfully');
+        this._refreshInProgress = false;
         return true;
       } catch(e) {
         console.warn('[oauth] token refresh failed:', e.message);
@@ -2301,6 +2306,7 @@ function app() {
         this.auth = { clientId: keepId, accessToken: '', refreshToken: '', tokenExpiresAt: 0, userInfo: null };
         this.saveAuth();
         this.notify('Higgsfield session expired — please sign in again.', 'error');
+        this._refreshInProgress = false;
         return false;
       }
     },
