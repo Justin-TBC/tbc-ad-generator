@@ -331,7 +331,13 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
                 error_body = b'{"pablo_error":"shopify_auth_failed","status":' + str(status).encode() + b'}'
                 self._relay(200, [], error_body)
             else:
-                self._relay(status, e.headers.items(), raw)
+                # Always return JSON — never relay HTML error pages
+                ct = dict(e.headers.items()).get('content-type', '')
+                if 'html' in ct.lower():
+                    error_body = f'{{"pablo_error":"shopify_error","status":{status}}}'.encode()
+                    self._relay(200, [], error_body)
+                else:
+                    self._relay(status, e.headers.items(), raw)
         except urllib.error.URLError as e:
             self.send_response(200)
             self._add_cors()

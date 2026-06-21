@@ -1605,7 +1605,13 @@ function app() {
 
       const sFetch = async (path) => {
         const res = await fetch(`/shopify${path}`);
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); }
+        catch(e) {
+          // Proxy returned HTML (likely SHOPIFY_TOKEN / SHOPIFY_DOMAIN not set in Railway)
+          throw new Error('Shopify not configured — set SHOPIFY_TOKEN and SHOPIFY_DOMAIN in Railway variables');
+        }
         if (data.pablo_error === 'shopify_auth_failed') {
           this.shopifyStatus = 'error';
           this.shopifyLastError = 'Shopify token invalid — check Railway variables';
