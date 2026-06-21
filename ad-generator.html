@@ -1454,10 +1454,10 @@ function app() {
         this.notify('Configure your image generation backend in Settings.', 'error');
       }
 
-      // Load brand config from Notion (non-blocking, falls back silently)
-      this.loadNotionConfig();
-      // Sync products from Shopify (non-blocking, falls back silently)
-      this.loadShopifyProducts();
+      // Load brand config from Notion (non-blocking, retries once after 3s if proxy is mid-deploy)
+      this.loadNotionConfig().catch(() => setTimeout(() => this.loadNotionConfig(), 3000));
+      // Sync products from Shopify (non-blocking, retries once after 3s)
+      this.loadShopifyProducts().catch(() => setTimeout(() => this.loadShopifyProducts(), 3000));
     },
 
     resetModelEndpointsToDefaults() {
