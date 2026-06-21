@@ -1454,6 +1454,14 @@ function app() {
         this.notify('Configure your image generation backend in Settings.', 'error');
       }
 
+      // Proactively refresh Higgsfield token if expired or expiring within 5 minutes
+      if (this.settings.imageBackend !== 'google' && this.auth.accessToken) {
+        const remainingMs = (this.auth.tokenExpiresAt || 0) - Date.now();
+        if (remainingMs < 5 * 60 * 1000) {
+          this.refreshHiggsfieldToken();
+        }
+      }
+
       // Load brand config from Notion (non-blocking, retries once after 3s if proxy is mid-deploy)
       this.loadNotionConfig().catch(() => setTimeout(() => this.loadNotionConfig(), 3000));
       // Sync products from Shopify (non-blocking, retries once after 3s)
@@ -2276,8 +2284,10 @@ function app() {
             client_id: this.auth.clientId,
           }),
         });
-        if (!r.ok) throw new Error(`Refresh ${r.status}: ${(await r.text()).slice(0,200)}`);
-        const tok = await r.json();
+        const refreshRaw = await r.text();
+      console.log('[oauth] refresh response:', r.status, refreshRaw.slice(0,300));
+      if (!r.ok) throw new Error(`Refresh ${r.status}: ${refreshRaw.slice(0,200)}`);
+        const tok = JSON.parse(refreshRaw);
         this.auth.accessToken = tok.access_token;
         if (tok.refresh_token) this.auth.refreshToken = tok.refresh_token;
         this.auth.tokenExpiresAt = Date.now() + (tok.expires_in || 3600) * 1000;
