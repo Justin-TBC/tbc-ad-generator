@@ -198,7 +198,7 @@
               <template x-for="refId in generateForm.referenceIds" :key="refId">
                 <template x-if="referenceById(refId)">
                   <div class="relative group">
-                    <img :src="blobUrl(referenceById(refId).imageBlob)" class="aspect-square w-full object-cover rounded bg-bg-elev">
+                    <img :src="refImgSrc(referenceById(refId))" class="aspect-square w-full object-cover rounded bg-bg-elev">
                     <button class="absolute top-1 right-1 w-5 h-5 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100" @click="generateForm.referenceIds = generateForm.referenceIds.filter(x => x !== refId)">✕</button>
                   </div>
                 </template>
@@ -384,7 +384,7 @@
                       :class="generateForm.referenceIds.includes(ref.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
                       @click="toggleRefSelect(ref.id)">
                       <div class="aspect-square bg-bg-elev relative">
-                        <img :src="blobUrl(ref.imageBlob)" class="w-full h-full object-cover">
+                        <img :src="refImgSrc(ref)" class="w-full h-full object-cover">
                         <div x-show="generateForm.referenceIds.includes(ref.id)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent text-bg flex items-center justify-center text-xs font-bold">✓</div>
                       </div>
                       <div class="p-2 text-xs text-zinc-100 truncate" x-text="ref.name || 'Unnamed'"></div>
@@ -403,7 +403,7 @@
                       :class="generateForm.referenceIds.includes(ref.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
                       @click="toggleRefSelect(ref.id)">
                       <div class="aspect-square bg-bg-elev relative">
-                        <img :src="blobUrl(ref.imageBlob)" class="w-full h-full object-cover">
+                        <img :src="refImgSrc(ref)" class="w-full h-full object-cover">
                         <div x-show="generateForm.referenceIds.includes(ref.id)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent text-bg flex items-center justify-center text-xs font-bold">✓</div>
                       </div>
                       <div class="p-2 text-xs text-zinc-100 truncate" x-text="ref.name || 'Unnamed'"></div>
@@ -855,7 +855,7 @@
         <template x-for="ref in filteredReferences" :key="ref.id">
           <div class="card overflow-hidden cursor-pointer hover:border-accent transition" @click="openReferenceModal(ref)">
             <div class="aspect-square bg-bg-elev">
-              <img :src="blobUrl(ref.imageBlob)" class="w-full h-full object-cover">
+              <img :src="refImgSrc(ref)" class="w-full h-full object-cover">
             </div>
             <div class="p-3">
               <div class="text-sm font-medium text-zinc-100 truncate" x-text="ref.name || 'Unnamed'"></div>
@@ -883,7 +883,7 @@
             <label class="label">Image *</label>
             <template x-if="referenceModal.ref?.imageBlob">
               <div class="relative">
-                <img :src="blobUrl(referenceModal.ref.imageBlob)" class="w-full max-h-72 object-contain rounded bg-bg-elev">
+                <img :src="refImgSrc(referenceModal.ref)" class="w-full max-h-72 object-contain rounded bg-bg-elev">
                 <button class="absolute top-2 right-2 btn btn-secondary text-xs" @click="referenceModal.ref.imageBlob=null">Replace</button>
               </div>
             </template>
@@ -936,8 +936,30 @@
     <!-- ===================== HISTORY ===================== -->
     <section x-show="view === 'history'">
       <h1 class="text-2xl font-semibold text-zinc-100 mb-2">History</h1>
-      <p class="text-sm text-muted mb-6">Will be built after step 4.</p>
-      <div class="card p-6 text-muted text-sm">Coming soon.</div>
+      <p class="text-sm text-muted mb-6">All generated images, newest first. Click Download to save or + Reference to add to your Reference Library.</p>
+      <div x-show="generationHistory.length === 0" class="card p-12 text-center">
+        <p class="text-muted">No generations yet. Generated images will appear here.</p>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <template x-for="item in generationHistory" :key="item.id">
+          <div class="card overflow-hidden">
+            <div class="aspect-square bg-bg-elev">
+              <img :src="item.imageUrl" class="w-full h-full object-cover" loading="lazy">
+            </div>
+            <div class="p-3">
+              <div class="text-sm font-medium text-zinc-100 truncate" x-text="item.label"></div>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="chip chip-muted text-xs" x-text="item.genType || 'ads'"></span>
+                <span class="text-xs text-muted" x-text="new Date(item.createdAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})"></span>
+              </div>
+              <div class="flex gap-2 mt-2">
+                <a :href="item.imageUrl" download class="btn btn-secondary text-xs py-1 px-2">Download</a>
+                <button class="btn btn-ghost text-xs py-1 px-2" @click="saveHistoryItemAsReference(item)">+ Reference</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
     </section>
 
     <!-- ===================== SETTINGS ===================== -->
@@ -1171,6 +1193,7 @@ function app() {
     dragState: null,
     blobUrlCache: new Map(),
     refTab: 'competitor',
+    generationHistory: [],
     notionStatus: 'idle',    // 'idle' | 'ok' | 'error'
     notionLastError: '',
     shopifyStatus: 'idle',   // 'idle' | 'ok' | 'error'
@@ -1465,6 +1488,8 @@ function app() {
 
       // Restore persisted brand assets from Railway Volume
       this.loadBrandAssets();
+      this.loadReferenceAssets();
+      this.loadGenerationHistory();
       // Load brand config from Notion (non-blocking, retries once after 3s if proxy is mid-deploy)
       this.loadNotionConfig().catch(() => setTimeout(() => this.loadNotionConfig(), 3000));
       // Sync products from Shopify (non-blocking, retries once after 3s)
@@ -2283,16 +2308,29 @@ function app() {
       const files = Array.from(event.dataTransfer.files||[]).filter(f => f.type.startsWith('image/'));
       if (!files.length) return;
       const arr = this.refTab === 'own' ? this.ownReferences : this.references;
+      const category = this.refTab === 'own' ? 'ref-own' : 'ref-competitor';
       for (const f of files) {
-        arr.push({ id:this.uid(), name:f.name.replace(/\.[^.]+$/,''), imageBlob:f, tags:[], notes:'', sourceUrl:'', extractedPrinciple:'' });
+        const entry = { id:this.uid(), name:f.name.replace(/\.[^.]+$/,''), imageBlob:f, tags:[], notes:'', sourceUrl:'', extractedPrinciple:'', imageServerId:null, imageUrl:null };
+        arr.push(entry);
+        this.persistAsset(f, category).then(serverId => {
+          if (serverId) { entry.imageServerId = serverId; entry.imageUrl = `/assets/serve/${serverId}`; }
+          this.saveReferenceAssets();
+        });
       }
       this.notify(files.length + ' reference(s) added.');
     },
 
-    saveReference() {
+    async saveReference() {
       const ref = { ...this.referenceModal.ref };
       if (!ref.imageBlob) return;
       if (!ref.id) ref.id = this.uid();
+      // Upload image to Volume if not yet persisted
+      if (!ref.imageServerId && ref.imageBlob) {
+        const category = this.referenceModal.source === 'own' ? 'ref-own' : 'ref-competitor';
+        const file = ref.imageBlob instanceof File ? ref.imageBlob : new File([ref.imageBlob], `${ref.id}.jpg`, { type: ref.imageBlob.type || 'image/jpeg' });
+        const serverId = await this.persistAsset(file, category);
+        if (serverId) { ref.imageServerId = serverId; ref.imageUrl = `/assets/serve/${serverId}`; }
+      }
       const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.references;
       if (this.referenceModal.editing) {
         const idx = arr.findIndex(r => r.id === ref.id);
@@ -2302,15 +2340,120 @@ function app() {
       }
       this.closeReferenceModal();
       this.notify('Reference saved.');
+      this.saveReferenceAssets();
     },
 
     deleteReference() {
       if (!confirm('Really delete this reference?')) return;
       const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.references;
-      const idx = arr.findIndex(r => r.id === this.referenceModal.ref.id);
-      if (idx >= 0) { arr.splice(idx, 1); this.generateForm.referenceIds = this.generateForm.referenceIds.filter(id => id !== this.referenceModal.ref.id); }
+      const ref = this.referenceModal.ref;
+      const idx = arr.findIndex(r => r.id === ref.id);
+      if (idx >= 0) {
+        arr.splice(idx, 1);
+        this.generateForm.referenceIds = this.generateForm.referenceIds.filter(id => id !== ref.id);
+        if (ref.imageServerId) this.deleteAsset(ref.imageServerId);
+      }
       this.closeReferenceModal();
       this.notify('Reference deleted.');
+      this.saveReferenceAssets();
+    },
+
+    // ---- Reference & Generation persistence ----
+    refImgSrc(ref) {
+      if (!ref) return '';
+      if (ref.imageBlob) return this.blobUrl(ref.imageBlob);
+      return ref.imageUrl || '';
+    },
+
+    async loadMeta(key) {
+      try {
+        const res = await fetch(`/assets/meta/${key}`);
+        const text = await res.text();
+        return text === 'null' ? null : JSON.parse(text);
+      } catch(e) { return null; }
+    },
+
+    async saveMeta(key, data) {
+      try {
+        await fetch(`/assets/meta/${key}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+      } catch(e) { console.warn('[meta] save failed:', e.message); }
+    },
+
+    async saveReferenceAssets() {
+      const serialize = (arr) => arr.map(r => ({
+        id: r.id, name: r.name, tags: r.tags || [], notes: r.notes || '',
+        sourceUrl: r.sourceUrl || '', extractedPrinciple: r.extractedPrinciple || '',
+        imageServerId: r.imageServerId || null, imageUrl: r.imageUrl || null,
+        fromMeta: r.fromMeta || false,
+      }));
+      await this.saveMeta('refs', { competitor: serialize(this.references), own: serialize(this.ownReferences) });
+    },
+
+    async loadReferenceAssets() {
+      if (this._refsLoaded) return;
+      this._refsLoaded = true;
+      try {
+        const data = await this.loadMeta('refs');
+        if (!data) return;
+        const restore = async (arr, target) => {
+          for (const ref of arr) {
+            if (!ref.imageUrl) continue;
+            let imageBlob = null;
+            try { const r = await fetch(ref.imageUrl); if (r.ok) imageBlob = await r.blob(); } catch(e) {}
+            target.push({ ...ref, imageBlob });
+          }
+        };
+        await Promise.all([
+          restore(data.competitor || [], this.references),
+          restore(data.own || [], this.ownReferences),
+        ]);
+        console.log(`[refs] restored ${this.references.length + this.ownReferences.length} references`);
+      } catch(e) { console.warn('[refs] restore failed:', e.message); }
+    },
+
+    async loadGenerationHistory() {
+      try {
+        const history = await this.loadMeta('generations');
+        if (Array.isArray(history)) this.generationHistory = history;
+      } catch(e) {}
+    },
+
+    async saveGenerationToHistory(job, genType) {
+      if (!job.outputBlob && !job.outputUrl) return;
+      try {
+        let serverId = null;
+        if (job.outputBlob) {
+          const file = new File([job.outputBlob], `${job.label.replace(/\s+/g,'-')}.png`, { type: 'image/png' });
+          serverId = await this.persistAsset(file, 'generation');
+        }
+        const entry = {
+          id: this.uid(), serverId,
+          imageUrl: serverId ? `/assets/serve/${serverId}` : (job.outputUrl || null),
+          label: job.label, genType,
+          aspect: job.aspect || this.generateForm.aspect,
+          createdAt: job.completedAt || Date.now(),
+        };
+        this.generationHistory.unshift(entry);
+        const history = (await this.loadMeta('generations')) || [];
+        await this.saveMeta('generations', [entry, ...history].slice(0, 200));
+      } catch(e) { console.warn('[history] save failed:', e.message); }
+    },
+
+    async saveHistoryItemAsReference(item) {
+      let imageBlob = null;
+      try { const r = await fetch(item.imageUrl); if (r.ok) imageBlob = await r.blob(); } catch(e) {}
+      if (!imageBlob) { this.notify('Could not fetch image', 'error'); return; }
+      const ref = {
+        id: this.uid(), name: item.label, imageBlob, tags: ['generated', item.genType || 'ads'],
+        notes: '', sourceUrl: '', extractedPrinciple: '',
+        imageServerId: item.serverId, imageUrl: item.imageUrl,
+      };
+      this.ownReferences.push(ref);
+      this.notify(`Saved "${item.label.slice(0,30)}" to Own Ads.`);
+      this.saveReferenceAssets();
     },
 
     // ============================================================
@@ -2746,7 +2889,7 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
               job.completedAt = Date.now();
               const imgBlob = this.base64ToBlob(result.base64, result.mimeType);
               job.outputBlob = imgBlob;
-              this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${this.uid().slice(0,8)}.png`);
+              this.saveGenerationToHistory(job, this.genType);
             } catch(e) {
               console.error('[gemini job]', e);
               job.status = 'failed';
@@ -2821,9 +2964,7 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
                 this.notify('Image ready, but CDN download blocked. Right-click → Save image as workaround.');
               }
 
-              if (imgBlob) {
-                this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${jobId.slice(0,8)}.png`);
-              }
+              this.saveGenerationToHistory(job, this.genType);
             } catch(e) {
               console.error(e);
               job.status = 'failed';
@@ -2887,7 +3028,7 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
           job.completedAt = Date.now();
           const imgBlob = this.base64ToBlob(result.base64, result.mimeType);
           job.outputBlob = imgBlob;
-          this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${this.uid().slice(0,8)}.png`);
+          this.saveGenerationToHistory(job, this.genType);
         } else {
           const allBlobs = [outputBlob, ...productBlobs, ...mascotBlobs].filter(Boolean);
           this.currentStep = `Uploading ${allBlobs.length} images…`;
@@ -2937,7 +3078,7 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
             job.outputBlob = imgBlob;
           } catch(e) { console.warn('[refine] Image download failed:', e); }
 
-          if (imgBlob) this.autoDownload(imgBlob, `tbc_${job.label.replace(/\s+/g,'-')}_${jobId.slice(0,8)}.png`);
+          this.saveGenerationToHistory(job, this.genType);
         }
 
         this.notify('Improvement done.');

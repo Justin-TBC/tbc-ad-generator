@@ -13,6 +13,7 @@ from __future__ import annotations
 import http.server
 import json
 import os
+import re
 import socketserver
 import sys
 import threading
@@ -514,6 +515,34 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
                 save_meta(m)
             sys.stderr.write(f"[assets] deleted {asset_id}\n")
             json_resp({"ok": True})
+            return
+
+        # GET /assets/meta/{key} — read JSON KV entry
+        if sub.startswith('/meta/') and self.command == 'GET':
+            key = sub[6:]
+            if not re.match(r'^[a-zA-Z0-9_-]+$', key):
+                self.send_error(400); return
+            path = os.path.join(ASSETS_DIR, f'_kv_{key}.json')
+            data = open(path, 'rb').read() if os.path.exists(path) else b'null'
+            self.send_response(200)
+            self._add_cors()
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        # POST /assets/meta/{key} — write JSON KV entry
+        if sub.startswith('/meta/') and self.command == 'POST':
+            key = sub[6:]
+            if not re.match(r'^[a-zA-Z0-9_-]+$', key):
+                self.send_error(400); return
+            length = int(self.headers.get('Content-Length', '0') or '0')
+            data = self.rfile.read(length) if length else b'null'
+            path = os.path.join(ASSETS_DIR, f'_kv_{key}.json')
+            with _ASSETS_LOCK:
+                with open(path, 'wb') as f: f.write(data)
+            json_resp({'ok': True})
             return
 
         self.send_error(404)

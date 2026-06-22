@@ -5,7 +5,9 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git remote *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(curl -s https://tbc-ad-generator-production.up.railway.app/assets/list)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }
