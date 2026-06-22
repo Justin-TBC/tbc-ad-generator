@@ -2394,21 +2394,32 @@ function app() {
       }
     },
 
-    async hfUploadImage(blob) {
-      const contentType = blob.type || 'image/png';
-      const ext = (contentType.split('/')[1] || 'png').toLowerCase();
-      const filename = `image_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
-      const uploadRes = await this.mcpCall('media_upload', { filename, content_type: contentType });
-      const upload = (uploadRes.uploads || [])[0];
-      if (!upload) throw new Error('media_upload returned no upload: ' + JSON.stringify(uploadRes).slice(0,300));
-      const put = await fetch(upload.upload_url, {
-        method: upload.method || 'PUT',
-        headers: { 'Content-Type': upload.content_type || contentType },
-        body: blob,
-      });
-      if (!put.ok) throw new Error(`PUT upload HTTP ${put.status}`);
-      await this.mcpCall('media_confirm', { type:'image', media_id: upload.media_id });
-      return upload.media_id;
+    async hfUploadImage(blob, _attempt = 1) {
+      const MAX_ATTEMPTS = 3;
+      try {
+        const contentType = blob.type || 'image/png';
+        const ext = (contentType.split('/')[1] || 'png').toLowerCase();
+        const filename = `image_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+        const uploadRes = await this.mcpCall('media_upload', { filename, content_type: contentType });
+        const upload = (uploadRes.uploads || [])[0];
+        if (!upload) throw new Error('media_upload returned no upload: ' + JSON.stringify(uploadRes).slice(0,300));
+        const put = await fetch(upload.upload_url, {
+          method: upload.method || 'PUT',
+          headers: { 'Content-Type': upload.content_type || contentType },
+          body: blob,
+        });
+        if (!put.ok) throw new Error(`PUT upload HTTP ${put.status}`);
+        await this.mcpCall('media_confirm', { type:'image', media_id: upload.media_id });
+        return upload.media_id;
+      } catch(e) {
+        const isTransient = /502|503|Application failed|upstream/i.test(e.message);
+        if (isTransient && _attempt < MAX_ATTEMPTS) {
+          console.warn(`[upload] attempt ${_attempt} failed (${e.message.slice(0,60)}), retrying in 3s…`);
+          await new Promise(r => setTimeout(r, 3000));
+          return this.hfUploadImage(blob, _attempt + 1);
+        }
+        throw e;
+      }
     },
 
     async hfUploadImages(blobs) {
