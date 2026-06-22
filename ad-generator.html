@@ -2423,7 +2423,15 @@ function app() {
     },
 
     async hfUploadImages(blobs) {
-      return Promise.all(blobs.map(b => this.hfUploadImage(b)));
+      // Upload in batches of 3 to avoid overwhelming Higgsfield and triggering 502s
+      const BATCH = 3;
+      const results = [];
+      for (let i = 0; i < blobs.length; i += BATCH) {
+        const batch = blobs.slice(i, i + BATCH);
+        const ids = await Promise.all(batch.map(b => this.hfUploadImage(b)));
+        results.push(...ids);
+      }
+      return results;
     },
 
     async hfGenerate(modelKey, { prompt, aspect_ratio, mediaIds, count }) {
