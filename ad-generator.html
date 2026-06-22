@@ -2143,14 +2143,22 @@ function app() {
     },
 
     async loadBrandAssets() {
+      // Only ever run once per session — prevents double-load from Alpine double-init
+      if (this._assetsLoaded) return;
+      this._assetsLoaded = true;
       try {
         const res = await fetch('/assets/list');
         const assets = await res.json();
         if (!Array.isArray(assets) || assets.length === 0) return;
 
         for (const asset of assets) {
+          // Skip if this serverId is already in the array (safety dedup)
+          const alreadyLoaded =
+            [...this.brandKit.logoImages, ...this.brandKit.mascotImages, ...this.brandKit.fontFiles]
+              .some(x => x.serverId === asset.id);
+          if (alreadyLoaded) continue;
+
           const entry = { id: this.uid(), name: asset.name, mimeType: asset.mime, serverId: asset.id, blob: null, url: `/assets/serve/${asset.id}`, label: asset.name.replace(/\.[^.]+$/, '') };
-          // Fetch blob immediately (needed for generation)
           try {
             const r = await fetch(entry.url);
             if (r.ok) entry.blob = await r.blob();
@@ -2164,7 +2172,7 @@ function app() {
             this.brandKit.descriptionServerId = asset.id;
           }
         }
-        if (assets.length > 0) console.log(`[assets] restored ${assets.length} brand assets`);
+        console.log(`[assets] restored ${assets.length} brand assets`);
       } catch(e) { console.warn('[assets] restore failed:', e.message); }
     },
 
