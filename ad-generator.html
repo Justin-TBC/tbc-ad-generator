@@ -710,7 +710,7 @@
             <div x-show="productModal.product.images && productModal.product.images.length" class="grid grid-cols-5 gap-2">
               <template x-for="(img, idx) in productModal.product.images" :key="img.id">
                 <div class="relative group">
-                  <img :src="blobUrl(img.blob)" class="w-full aspect-square rounded object-cover bg-bg-elev">
+                  <img :src="imgSrc(img)" class="w-full aspect-square rounded object-cover bg-bg-elev">
                   <button class="absolute top-1 right-1 w-5 h-5 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition" @click="productModal.product.images.splice(idx,1)">✕</button>
                 </div>
               </template>
