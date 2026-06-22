@@ -2526,7 +2526,7 @@ function app() {
       const brandContext = kit.description?.trim()
         ? `\n\nBrand context:\n"""\n${kit.description.trim().slice(0,1500)}\n"""\n` : '';
 
-      const productBlobs = this.selectedProducts.flatMap(p => p.images?.map(img => img.blob)||[]);
+      const productBlobs = this.selectedProducts.map(p => p.images?.[0]?.blob).filter(Boolean);
       const productCount = productBlobs.length || 1;
       const mascotCount = (kit.mascotImages||[]).length;
       const hasMascot = mascotCount > 0;
@@ -2594,7 +2594,7 @@ Copy language: GERMAN. All text in the image must be in German. Brand statements
       const brandContext = kit.description?.trim()
         ? `\n\nBrand context:\n"""\n${kit.description.trim().slice(0,1500)}\n"""\n` : '';
 
-      const productBlobs = this.selectedProducts.flatMap(p => p.images?.map(img => img.blob)||[]);
+      const productBlobs = this.selectedProducts.map(p => p.images?.[0]?.blob).filter(Boolean);
       const productCount = productBlobs.length || 1;
       const mascotCount = (kit.mascotImages||[]).length;
       const hasMascot = mascotCount > 0;
@@ -2691,7 +2691,7 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
       const refs = f.referenceIds.map(id => this.referenceById(id)).filter(Boolean);
       this.currentStep = 'Fetching product images…';
       await this.fetchProductImageBlobs();
-      const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img => img.blob).filter(Boolean));
+      const productBlobs = this.selectedProducts.map(p => p.images?.[0]?.blob).filter(Boolean);
       const mascotBlobs = (kit.mascotImages||[]).map(m => m.blob);
 
       let jobs = [];
