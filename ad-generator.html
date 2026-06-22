@@ -1188,6 +1188,7 @@ function app() {
     toast: { show: false, message: '', type: 'success' },
     dragState: null,
     blobUrlCache: new Map(),
+    _mediaIdCache: new Map(), // blob → {mediaId, uploadedAt} — avoids re-uploading same image
     refTab: 'competitor',
     generationHistory: [],
     notionStatus: 'idle',    // 'idle' | 'ok' | 'error'
@@ -1491,6 +1492,8 @@ function app() {
       this.loadNotionConfig().catch(() => setTimeout(() => this.loadNotionConfig(), 3000));
       // Sync only NEW products from Shopify (non-blocking)
       this.loadShopifyProducts().catch(() => setTimeout(() => this.loadShopifyProducts(), 3000));
+      // Pre-upload static assets to Higgsfield in background (warms the media ID cache)
+      setTimeout(() => this.preUploadAssets(), 4000);
     },
 
     resetModelEndpointsToDefaults() {
@@ -2596,15 +2599,58 @@ function app() {
     },
 
     async hfUploadImages(blobs) {
-      // Upload in batches of 3 to avoid overwhelming Higgsfield and triggering 502s
       const BATCH = 3;
+      const CACHE_TTL = 20 * 3600 * 1000; // 20 hours (Higgsfield media IDs valid ~24h)
       const results = [];
       for (let i = 0; i < blobs.length; i += BATCH) {
         const batch = blobs.slice(i, i + BATCH);
-        const ids = await Promise.all(batch.map(b => this.hfUploadImage(b)));
+        const ids = await Promise.all(batch.map(async b => {
+          // Check session cache first
+          const cached = this._mediaIdCache.get(b);
+          if (cached && Date.now() - cached.uploadedAt < CACHE_TTL) {
+            console.log('[upload] cache hit — skipping re-upload');
+            return cached.mediaId;
+          }
+          const mediaId = await this.hfUploadImage(b);
+          this._mediaIdCache.set(b, { mediaId, uploadedAt: Date.now() });
+          return mediaId;
+        }));
         results.push(...ids);
       }
       return results;
+    },
+
+    // Pre-upload product + mascot images in the background so Generate is instant
+    async preUploadAssets() {
+      if (this.settings.imageBackend !== 'higgsfield') return;
+      if (!this.auth.accessToken) return;
+      try {
+        // Collect blobs to pre-upload
+        const toUpload = [];
+        // Selected products (or first 5 if none selected)
+        const prods = this.generateForm.productIds.length
+          ? this.selectedProducts
+          : this.products.slice(0, 5);
+        for (const prod of prods) {
+          const img = prod.images?.[0];
+          if (!img) continue;
+          let blob = img.blob;
+          if (!blob && img.url) {
+            try { const r = await fetch(img.url); if (r.ok) { blob = await r.blob(); img.blob = blob; } } catch(e) {}
+          }
+          if (blob && !this._mediaIdCache.has(blob)) toUpload.push(blob);
+        }
+        // Mascot images
+        for (const m of this.brandKit.mascotImages || []) {
+          if (m.blob && !this._mediaIdCache.has(m.blob)) toUpload.push(m.blob);
+        }
+        if (toUpload.length === 0) return;
+        console.log(`[preupload] uploading ${toUpload.length} assets in background…`);
+        await this.hfUploadImages(toUpload);
+        console.log(`[preupload] done — Generate will skip ${toUpload.length} uploads`);
+      } catch(e) {
+        console.warn('[preupload] failed (non-critical):', e.message);
+      }
     },
 
     async hfGenerate(modelKey, { prompt, aspect_ratio, mediaIds, count }) {
