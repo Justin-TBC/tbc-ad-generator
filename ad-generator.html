@@ -2770,59 +2770,80 @@ function app() {
         : '';
 
       const refIdx = productCount + mascotCount;
-      const refLine = reference
-        ? `\n\n╔══ STRUCTURAL REFERENCE — HIGHEST PRIORITY ══╗
-The ${ordinals[refIdx]} image is the LAYOUT LAW for this ad. You MUST replicate its exact composition:
-- Number of visual zones/panels
-- Position and size of the product
-- Where text sits (top/bottom/left/right/centre)
-- Whether it uses a lifestyle scene, flat graphic, split layout, badge-and-icon grid, or another format
-- Camera angle, cropping, negative space distribution
-- Overall energy and visual rhythm
-
-The concept behind this layout: "${principle}"${refTags ? ` (visual tags: ${refTags})` : ''}.
-
-DO NOT fall back to a default orange-background-mascot-icons layout. If the reference shows a lifestyle photo — produce a lifestyle photo. If it shows a split panel — produce a split panel. Follow the reference structure precisely.
-
-What to swap to TBC brand identity (non-negotiable):
-- Product → The Better Cat product from the product image(s)
-- Any character/mascot → ${hasMascot ? 'the Sphynx mascot from the mascot image(s)' : 'an expressive Sphynx cat with a strong attitude'}
-- Colors → pick the 2-3 TBC brand colours that best complement the product packaging colours (see BRAND COLOURS below)
-- All copy → native German, Degural Display headlines
-╚══════════════════════════════════════════════╝`
-        : '';
-
-      const imageGuide = productLine + mascotLine + refLine;
       const angleBlock = this.generateForm.angle
-        ? `\n\nCAMPAIGN ANGLE: "${this.generateForm.angle}" — scene, composition, copy and mood all serve this angle.`
+        ? `\nCAMPAIGN ANGLE: "${this.generateForm.angle}"`
         : '';
       const productContext = this.buildProductContext();
-      const mascotDesc = kit.mascotDescription ? `\nMascot: ${kit.mascotDescription}.` : '';
+      const mascotDesc = kit.mascotDescription ? `Mascot description: ${kit.mascotDescription}.` : '';
 
-      return `The Better Cat — premium cat food ad, ${this.generateForm.aspect}, bold graphic brand world (${tone}).
+      const brandColours = `EXACT BRAND COLOURS — pick 2–3 that complement the product packaging, reproduce hex precisely:
+TBC Orange #FA7B3C · TBC Sky #18044D · TBC Yellow #FFE026 · TBC Oat #FCF6E0
+Do NOT use any colour outside this list. Do not approximate.`;
 
-${imageGuide}${angleBlock}${productContext}
+      const textRule = `TEXT: pixel-sharp, high-contrast, no blur, no anti-aliasing. Crisp vector-quality letterforms.`;
 
-Visual style: Degural Display headlines (large, left-aligned), Arbeit body copy, bold full-bleed colour backgrounds, graphic cut-out style.${mascotDesc}
+      const copyRule = `COPY: native German copywriter — think in German, not translated from English. Short, punchy, colloquial.${copySamples ? ` Tone: ${copySamples}.` : ''}`;
 
-EXACT BRAND COLOURS — use the hex values that best complement the product packaging. Pick 2-3 from this list per layout (do not always default to orange):
-- TBC Orange: #FA7B3C
-- TBC Sky: #18044D
-- TBC Yellow: #FFE026
-- TBC Oat: #FCF6E0
-Reproduce chosen hex values precisely — do not approximate or shift. Do NOT use any colour outside this list.
+      if (reference) {
+        // Reference-led prompt: the reference layout is the primary driver
+        return `You are creating a The Better Cat premium cat food ad (${this.generateForm.aspect}).
 
-TEXT RENDERING: pixel-sharp, high-contrast, no blur, no soft edges, no anti-aliasing on type. Crisp vector-quality letterforms.
+IMAGE INPUTS:
+${productLine}${mascotLine}
+The ${ordinals[refIdx]} image is the REFERENCE LAYOUT to replicate.
 
-Do:
-${dos || '- bold headlines, strong contrast, expressive mascot'}
+━━━ STEP 1: ANALYSE THE REFERENCE ━━━
+Study image ${refIdx + 1} carefully and note:
+• Exactly how many products appear and how they are arranged (single sachet / stack / flat lay / etc.)
+• Whether a character or mascot appears — and where
+• Text placement: where is the headline? body text? any badges or callouts?
+• Background: solid colour, gradient, photo, or graphic?
+• Graphic elements present: icons, circles, dividers, stickers — list them
+• Overall format: lifestyle / product-only / split panel / graphic / collage / etc.
 
-Don't:
-${donts || '- generic stock imagery, passive cats, always the same orange background layout'}
+━━━ STEP 2: REPRODUCE THAT EXACT STRUCTURE ━━━
+Use the reference as a precise template. Substitute only these elements:
+• Product(s) → The Better Cat product from image(s) 1${productCount > 1 ? '–' + productCount : ''}
+  — match the QUANTITY shown in the reference (if reference shows 1 product, show 1 product)
+• Character → ${hasMascot ? `the Sphynx mascot from image ${mascotStartIdx + 1} — only include if reference shows a character` : 'only add a Sphynx cat if the reference shows a character/mascot'}
+• Colours → TBC brand palette (see below), chosen to complement the product
+• Copy → native German headline in the same position as the reference text
 
-GERMAN COPY: write as a native German copywriter — think in German, not English. Short, punchy, colloquial. Avoid literal translations of English phrases. Natural German rhythm.${copySamples ? ` Tone reference: ${copySamples}.` : ''}${brandContext}
+━━━ HARD CONSTRAINTS — DO NOT ADD these unless the reference shows them ━━━
+✗ Do NOT add a mascot if reference has no character
+✗ Do NOT add circular fact badges if reference has none
+✗ Do NOT add icon grids if reference has none
+✗ Do NOT stack multiple products if reference shows one
+✗ Do NOT add a full-bleed orange background if reference uses a different background
+✗ Do NOT invent graphic elements not present in the reference
 
-All text in image: GERMAN, left-aligned, max 1-2 lines. No drop shadows or gradients on type.`;
+Layout concept: "${principle}"${refTags ? ` · tags: ${refTags}` : ''}
+${angleBlock}${productContext}
+
+${brandColours}
+${textRule}
+Do:\n${dos || '- bold contrast, strong focal point'}
+Don't:\n${donts || '- generic layout, passive imagery'}
+${brandContext}
+${copyRule}
+All text: GERMAN. No drop shadows or gradients on type.${mascotDesc ? '\n' + mascotDesc : ''}`;
+      }
+
+      // No reference — open creative brief
+      return `The Better Cat — premium cat food ad, ${this.generateForm.aspect}. Tone: ${tone}.
+
+${productLine}${mascotLine}
+${angleBlock}${productContext}
+
+Create a bold, varied composition. Do NOT default to orange-background-mascot-icons — explore different formats: lifestyle scene, product close-up, typographic hero, split panel.
+
+${brandColours}
+${textRule}
+Do:\n${dos || '- bold contrast, strong focal point, varied layouts'}
+Don't:\n${donts || '- generic repetitive layouts'}
+${brandContext}
+${copyRule}
+All text: GERMAN. No drop shadows or gradients on type.${mascotDesc ? '\n' + mascotDesc : ''}`;
     },
 
     buildShopPrompt(templateId, references = []) {
