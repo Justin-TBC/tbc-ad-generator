@@ -2771,22 +2771,30 @@ function app() {
 
       const refIdx = productCount + mascotCount;
       const refLine = reference
-        ? `\n\n=== STRUCTURAL REFERENCE ===\nThe ${ordinals[refIdx]} image is a STRUCTURAL TEMPLATE. Strongly follow its layout pattern: composition, scene type, panels, framing, badge/text positions. Concept: '${principle}'${refTags ? ` (tags: ${refTags})` : ''}.
+        ? `\n\n╔══ STRUCTURAL REFERENCE — HIGHEST PRIORITY ══╗
+The ${ordinals[refIdx]} image is the LAYOUT LAW for this ad. You MUST replicate its exact composition:
+- Number of visual zones/panels
+- Position and size of the product
+- Where text sits (top/bottom/left/right/centre)
+- Whether it uses a lifestyle scene, flat graphic, split layout, badge-and-icon grid, or another format
+- Camera angle, cropping, negative space distribution
+- Overall energy and visual rhythm
 
-KEEP FROM REFERENCE: layout pattern, composition, framing, panel arrangement, energy.
-SWAP TO TBC BRAND IDENTITY:
-- Product → The Better Cat product from product image(s)
-- Character → ${hasMascot ? 'the Sphynx mascot from the mascot image(s)' : 'an expressive Sphynx cat with attitude'}
-- Colors → TBC Sky #18044D, TBC Yellow #FFE026, TBC Orange #FA7B3C, TBC Oat #FCF6E0 only
-- Copy → German, TBC brand voice, left-aligned, max 1-2 lines
-- Typography → Degural Display headlines, Arbeit body
+The concept behind this layout: "${principle}"${refTags ? ` (visual tags: ${refTags})` : ''}.
 
-The final output must feel unmistakably like a The Better Cat ad.`
+DO NOT fall back to a default orange-background-mascot-icons layout. If the reference shows a lifestyle photo — produce a lifestyle photo. If it shows a split panel — produce a split panel. Follow the reference structure precisely.
+
+What to swap to TBC brand identity (non-negotiable):
+- Product → The Better Cat product from the product image(s)
+- Any character/mascot → ${hasMascot ? 'the Sphynx mascot from the mascot image(s)' : 'an expressive Sphynx cat with a strong attitude'}
+- Colors → pick the 2-3 TBC brand colours that best complement the product packaging colours (see BRAND COLOURS below)
+- All copy → native German, Degural Display headlines
+╚══════════════════════════════════════════════╝`
         : '';
 
       const imageGuide = productLine + mascotLine + refLine;
       const angleBlock = this.generateForm.angle
-        ? `\n\nCAMPAIGN ANGLE: Focus this ad specifically on the angle: "${this.generateForm.angle}". Scene, composition, copy, and visual mood should all serve this angle.`
+        ? `\n\nCAMPAIGN ANGLE: "${this.generateForm.angle}" — scene, composition, copy and mood all serve this angle.`
         : '';
       const productContext = this.buildProductContext();
       const mascotDesc = kit.mascotDescription ? `\nMascot: ${kit.mascotDescription}.` : '';
@@ -2795,26 +2803,26 @@ The final output must feel unmistakably like a The Better Cat ad.`
 
 ${imageGuide}${angleBlock}${productContext}
 
-Visual style: large left-aligned Degural Display headlines, Arbeit body copy, bold full-bleed colour backgrounds, graphic cut-out mascot style. Hero colour TBC Orange (#FA7B3C) as dominant anchor.${mascotDesc}
+Visual style: Degural Display headlines (large, left-aligned), Arbeit body copy, bold full-bleed colour backgrounds, graphic cut-out style.${mascotDesc}
 
-EXACT BRAND COLOURS — reproduce these hex values precisely, do not approximate or shift them:
-- TBC Orange (hero/dominant): #FA7B3C
+EXACT BRAND COLOURS — use the hex values that best complement the product packaging. Pick 2-3 from this list per layout (do not always default to orange):
+- TBC Orange: #FA7B3C
 - TBC Sky: #18044D
 - TBC Yellow: #FFE026
 - TBC Oat: #FCF6E0
-Use maximum 4 colours per layout. Do NOT introduce any colour not in this list.
+Reproduce chosen hex values precisely — do not approximate or shift. Do NOT use any colour outside this list.
 
-TEXT RENDERING: all text must be pixel-sharp and high-contrast — no blur, no soft edges, no anti-aliasing on type. Crisp vector-quality letterforms. Strong contrast between text colour and background colour.
+TEXT RENDERING: pixel-sharp, high-contrast, no blur, no soft edges, no anti-aliasing on type. Crisp vector-quality letterforms.
 
 Do:
-${dos || '- Sphynx mascot with attitude, bold headlines, strong contrast'}
+${dos || '- bold headlines, strong contrast, expressive mascot'}
 
 Don't:
-${donts || '- generic stock imagery, passive cats, busy cluttered scenes'}
+${donts || '- generic stock imagery, passive cats, always the same orange background layout'}
 
-${copySamples ? `Copy reference: ${copySamples}.` : ''}${brandContext}
+GERMAN COPY: write as a native German copywriter — think in German, not English. Short, punchy, colloquial. Avoid literal translations of English phrases. Natural German rhythm.${copySamples ? ` Tone reference: ${copySamples}.` : ''}${brandContext}
 
-Copy language: GERMAN. All text in the image must be in German. Brand statements left-aligned, max 1-2 lines. No drop shadows, no gradients on type. Rebellious, confident, premium cat food energy.`;
+All text in image: GERMAN, left-aligned, max 1-2 lines. No drop shadows or gradients on type.`;
     },
 
     buildShopPrompt(templateId, references = []) {
@@ -2893,16 +2901,16 @@ ${productLine}${mascotLine}${refLine}${angleBlock}${productContext}
 SCENE & COMPOSITION:
 ${scene.body}
 
-Visual style: large left-aligned Degural Display headlines, Arbeit body copy, bold colours.${mascotDesc}
+Visual style: Degural Display headlines (large, left-aligned), Arbeit body copy, bold colours.${mascotDesc}
 
-EXACT BRAND COLOURS — reproduce these hex values precisely, do not approximate or shift them:
-- TBC Orange (hero/dominant): #FA7B3C
+EXACT BRAND COLOURS — pick 2-3 that best complement the product packaging. Do not always default to orange:
+- TBC Orange: #FA7B3C
 - TBC Sky: #18044D
 - TBC Yellow: #FFE026
 - TBC Oat: #FCF6E0
-Use maximum 4 colours per layout. Do NOT introduce any colour not in this list.
+Reproduce chosen hex values precisely — no approximation. Do NOT use any colour outside this list.
 
-TEXT RENDERING: all text must be pixel-sharp and high-contrast — no blur, no soft edges, no anti-aliasing on type. Crisp vector-quality letterforms. Strong contrast between text colour and background colour.
+TEXT RENDERING: pixel-sharp, high-contrast, no blur, no soft edges, no anti-aliasing. Crisp vector-quality letterforms.
 
 Do:
 ${dos || '- bold colours, expressive cats, clean compositions'}
@@ -2910,7 +2918,8 @@ ${dos || '- bold colours, expressive cats, clean compositions'}
 Don't:
 ${donts || '- generic stock imagery, passive cats'}
 ${brandContext}
-${scene.text} Copy language: GERMAN. All text in the image must be in German. Rebellious, confident, premium cat food energy.`;
+GERMAN COPY: write as a native German copywriter — think in German, not English. Natural German rhythm, short and punchy. No literal translations.
+${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food energy.`;
     },
 
     // ============================================================
