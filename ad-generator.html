@@ -491,8 +491,8 @@
                 <div x-show="brandKit.logoImages && brandKit.logoImages.length" class="flex flex-wrap gap-2">
                   <template x-for="(img, idx) in brandKit.logoImages" :key="img.id">
                     <div class="relative group">
-                      <img :src="blobUrl(img.blob)" class="w-12 h-12 rounded object-contain bg-bg-elev border border-bg-border">
-                      <button class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center" @click="brandKit.logoImages.splice(idx,1)">✕</button>
+                      <img :src="imgSrc(img)" class="w-12 h-12 rounded object-contain bg-bg-elev border border-bg-border">
+                      <button class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center" @click="deleteAsset(img.serverId); brandKit.logoImages.splice(idx,1)">✕</button>
                     </div>
                   </template>
                 </div>
@@ -522,7 +522,7 @@
               <div class="flex items-center gap-2">
                 <span class="chip chip-muted text-xs flex-shrink-0" x-text="ff.name"></span>
                 <input class="input text-xs flex-1" x-model="ff.label" placeholder="e.g. Degural Display Bold">
-                <button class="btn btn-ghost text-danger text-xs px-2" @click="brandKit.fontFiles.splice(idx,1)">✕</button>
+                <button class="btn btn-ghost text-danger text-xs px-2" @click="deleteAsset(ff.serverId); brandKit.fontFiles.splice(idx,1)">✕</button>
               </div>
             </template>
           </div>
@@ -561,8 +561,8 @@
             <div x-show="brandKit.mascotImages && brandKit.mascotImages.length" class="flex flex-wrap gap-2">
               <template x-for="(img, idx) in brandKit.mascotImages" :key="img.id">
                 <div class="relative group">
-                  <img :src="blobUrl(img.blob)" class="w-16 h-16 rounded object-contain bg-bg-elev border border-bg-border">
-                  <button class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center" @click="brandKit.mascotImages.splice(idx,1)">✕</button>
+                  <img :src="imgSrc(img)" class="w-16 h-16 rounded object-contain bg-bg-elev border border-bg-border">
+                  <button class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center" @click="deleteAsset(img.serverId); brandKit.mascotImages.splice(idx,1)">✕</button>
                 </div>
               </template>
             </div>
@@ -1462,6 +1462,8 @@ function app() {
         }
       }
 
+      // Restore persisted brand assets from Railway Volume
+      this.loadBrandAssets();
       // Load brand config from Notion (non-blocking, retries once after 3s if proxy is mid-deploy)
       this.loadNotionConfig().catch(() => setTimeout(() => this.loadNotionConfig(), 3000));
       // Sync products from Shopify (non-blocking, retries once after 3s)
@@ -2081,22 +2083,32 @@ function app() {
     bkHandleFileInput(event, target) {
       const files = Array.from(event.target.files || []).filter(f => f.type.startsWith('image/'));
       if (!files.length) return;
-      if (target === 'logo')   files.forEach(f => this.brandKit.logoImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
-      if (target === 'mascot') files.forEach(f => this.brandKit.mascotImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
+      files.forEach(f => {
+        const entry = { id: this.uid(), name: f.name, blob: f, mimeType: f.type, serverId: null };
+        if (target === 'logo')   this.brandKit.logoImages.push(entry);
+        if (target === 'mascot') this.brandKit.mascotImages.push(entry);
+        this.persistAsset(f, target === 'logo' ? 'logo' : 'mascot').then(id => { if (id) entry.serverId = id; });
+      });
       event.target.value = '';
     },
 
     bkHandleDrop(event, target) {
       const files = Array.from(event.dataTransfer.files||[]).filter(f => f.type.startsWith('image/'));
       if (!files.length) return;
-      if (target === 'logo')   files.forEach(f => this.brandKit.logoImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
-      if (target === 'mascot') files.forEach(f => this.brandKit.mascotImages.push({ id: this.uid(), name: f.name, blob: f, mimeType: f.type }));
+      files.forEach(f => {
+        const entry = { id: this.uid(), name: f.name, blob: f, mimeType: f.type, serverId: null };
+        if (target === 'logo')   this.brandKit.logoImages.push(entry);
+        if (target === 'mascot') this.brandKit.mascotImages.push(entry);
+        this.persistAsset(f, target === 'logo' ? 'logo' : 'mascot').then(id => { if (id) entry.serverId = id; });
+      });
     },
 
     bkHandleFontInput(event) {
       const files = Array.from(event.target.files || []);
       for (const f of files) {
-        this.brandKit.fontFiles.push({ id: this.uid(), name: f.name, label: f.name.replace(/\.[^.]+$/, ''), blob: f });
+        const entry = { id: this.uid(), name: f.name, label: f.name.replace(/\.[^.]+$/, ''), blob: f, serverId: null };
+        this.brandKit.fontFiles.push(entry);
+        this.persistAsset(f, 'font').then(id => { if (id) entry.serverId = id; });
       }
       event.target.value = '';
     },
@@ -2104,8 +2116,51 @@ function app() {
     bkHandleFontDrop(event) {
       const files = Array.from(event.dataTransfer.files||[]).filter(f => /\.(ttf|woff2?|otf)$/i.test(f.name));
       for (const f of files) {
-        this.brandKit.fontFiles.push({ id: this.uid(), name: f.name, label: f.name.replace(/\.[^.]+$/, ''), blob: f });
+        const entry = { id: this.uid(), name: f.name, label: f.name.replace(/\.[^.]+$/, ''), blob: f, serverId: null };
+        this.brandKit.fontFiles.push(entry);
+        this.persistAsset(f, 'font').then(id => { if (id) entry.serverId = id; });
       }
+    },
+
+    // ---- Asset persistence (Railway Volume via /assets/ proxy routes) ----
+    async persistAsset(file, category) {
+      try {
+        const params = new URLSearchParams({ name: file.name, category, mime: file.type || 'application/octet-stream' });
+        const res = await fetch(`/assets/upload?${params}`, { method: 'POST', body: file });
+        const data = await res.json();
+        if (data.ok) { console.log(`[assets] persisted ${category}:`, data.id); return data.id; }
+      } catch(e) { console.warn('[assets] persist failed:', e.message); }
+      return null;
+    },
+
+    async deleteAsset(serverId) {
+      if (!serverId) return;
+      try {
+        await fetch(`/assets/delete/${serverId}`, { method: 'DELETE' });
+        console.log('[assets] deleted:', serverId);
+      } catch(e) { console.warn('[assets] delete failed:', e.message); }
+    },
+
+    async loadBrandAssets() {
+      try {
+        const res = await fetch('/assets/list');
+        const assets = await res.json();
+        if (!Array.isArray(assets) || assets.length === 0) return;
+
+        for (const asset of assets) {
+          const entry = { id: this.uid(), name: asset.name, mimeType: asset.mime, serverId: asset.id, blob: null, url: `/assets/serve/${asset.id}`, label: asset.name.replace(/\.[^.]+$/, '') };
+          // Fetch blob immediately (needed for generation)
+          try {
+            const r = await fetch(entry.url);
+            if (r.ok) entry.blob = await r.blob();
+          } catch(e) {}
+
+          if (asset.category === 'logo')   this.brandKit.logoImages.push(entry);
+          if (asset.category === 'mascot') this.brandKit.mascotImages.push(entry);
+          if (asset.category === 'font')   this.brandKit.fontFiles.push(entry);
+        }
+        if (assets.length > 0) console.log(`[assets] restored ${assets.length} brand assets`);
+      } catch(e) { console.warn('[assets] restore failed:', e.message); }
     },
 
     bkHandleMarkdown(event) {

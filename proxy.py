@@ -11,12 +11,14 @@ Verwendung:
 from __future__ import annotations
 
 import http.server
+import json
 import os
 import socketserver
 import sys
+import uuid
 import urllib.request
 import urllib.error
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 UPSTREAM_BASE  = "https://mcp.higgsfield.ai"
 DEFAULT_PORT   = int(os.environ.get("PORT", 8000))
@@ -33,6 +35,8 @@ SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip()
 # shpat_ = Admin API token; anything else = Storefront token
 SHOPIFY_IS_STOREFRONT = bool(SHOPIFY_TOKEN) and not SHOPIFY_TOKEN.startswith("shpat_")
 META_PREFIX     = "/meta"
+ASSETS_PREFIX   = "/assets"
+ASSETS_DIR      = os.environ.get("ASSETS_DIR", "/data/assets")
 META_BASE       = "https://graph.facebook.com/v21.0"
 META_TOKEN      = os.environ.get("META_ACCESS_TOKEN", "")
 
@@ -105,20 +109,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _is_meta(self):
         return self.path.startswith(META_PREFIX + "/") or self.path == META_PREFIX
 
+    def _is_assets(self):
+        return self.path.startswith(ASSETS_PREFIX + "/") or self.path == ASSETS_PREFIX
+
     def do_GET(self):
         if self._is_api():           self._proxy()
         elif self._is_notion():      self._notion_proxy()
         elif self._is_shopify_auth():self._shopify_auth()
         elif self._is_shopify():     self._shopify_proxy()
         elif self._is_meta():        self._meta_proxy()
+        elif self._is_assets():      self._assets_handler()
         else:                        super().do_GET()
 
     def do_POST(self):
-        if self._is_api():      self._proxy()
-        elif self._is_notion(): self._notion_proxy()
-        elif self._is_shopify():self._shopify_proxy()
-        elif self._is_meta():   self._meta_proxy()
-        else:                   self.send_error(404)
+        if self._is_api():           self._proxy()
+        elif self._is_notion():      self._notion_proxy()
+        elif self._is_shopify():     self._shopify_proxy()
+        elif self._is_meta():        self._meta_proxy()
+        elif self._is_assets():      self._assets_handler()
+        else:                        self.send_error(404)
 
     def do_PUT(self):
         if self._is_api():      self._proxy()
@@ -128,11 +137,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         else:                   self.send_error(404)
 
     def do_DELETE(self):
-        if self._is_api():      self._proxy()
-        elif self._is_notion(): self._notion_proxy()
-        elif self._is_shopify():self._shopify_proxy()
-        elif self._is_meta():   self._meta_proxy()
-        else:                   self.send_error(404)
+        if self._is_api():           self._proxy()
+        elif self._is_notion():      self._notion_proxy()
+        elif self._is_shopify():     self._shopify_proxy()
+        elif self._is_meta():        self._meta_proxy()
+        elif self._is_assets():      self._assets_handler()
+        else:                        self.send_error(404)
 
     def do_PATCH(self):
         if self._is_api():      self._proxy()
@@ -415,6 +425,93 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
             self.wfile.write(
                 f'{{"error":"notion_upstream_error","detail":"{str(e).replace(chr(34), "")}"}}'.encode()
             )
+
+    # --- Asset storage (Railway Volume at ASSETS_DIR) ---
+    def _assets_handler(self):
+        os.makedirs(ASSETS_DIR, exist_ok=True)
+        meta_path = os.path.join(ASSETS_DIR, "_meta.json")
+
+        def load_meta():
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path) as f: return json.load(f)
+                except Exception: pass
+            return []
+
+        def save_meta(m):
+            with open(meta_path, "w") as f: json.dump(m, f)
+
+        def json_resp(data, status=200):
+            body = json.dumps(data).encode()
+            self.send_response(status)
+            self._add_cors()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        sub = parsed.path[len(ASSETS_PREFIX):]  # e.g. "/list", "/upload", "/serve/abc.png", "/delete/abc.png"
+
+        # GET /assets/list
+        if sub in ("/list", "/list/") and self.command == "GET":
+            json_resp(load_meta())
+            return
+
+        # POST /assets/upload?name=...&category=...&mime=...
+        if sub in ("/upload", "/upload/") and self.command == "POST":
+            name     = qs.get("name",     ["unnamed"])[0]
+            category = qs.get("category", ["other"])[0]
+            mime     = qs.get("mime",     ["application/octet-stream"])[0]
+            ext      = os.path.splitext(name)[1].lower() or ".bin"
+            asset_id = uuid.uuid4().hex[:16] + ext
+            length   = int(self.headers.get("Content-Length", "0") or "0")
+            data     = self.rfile.read(length) if length else b""
+            with open(os.path.join(ASSETS_DIR, asset_id), "wb") as f:
+                f.write(data)
+            m = load_meta()
+            m.append({"id": asset_id, "name": name, "category": category, "mime": mime})
+            save_meta(m)
+            sys.stderr.write(f"[assets] saved {asset_id} ({len(data)} bytes, cat={category})\n")
+            json_resp({"ok": True, "id": asset_id})
+            return
+
+        # GET /assets/serve/{id}
+        if sub.startswith("/serve/") and self.command == "GET":
+            asset_id = sub[7:]
+            if "/" in asset_id or ".." in asset_id:
+                self.send_error(400); return
+            path = os.path.join(ASSETS_DIR, asset_id)
+            if not os.path.exists(path):
+                self.send_error(404); return
+            m    = load_meta()
+            meta = next((a for a in m if a["id"] == asset_id), {})
+            mime = meta.get("mime", "application/octet-stream")
+            with open(path, "rb") as f: body = f.read()
+            self.send_response(200)
+            self._add_cors()
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # DELETE /assets/delete/{id}
+        if sub.startswith("/delete/") and self.command == "DELETE":
+            asset_id = sub[8:]
+            if "/" in asset_id or ".." in asset_id:
+                self.send_error(400); return
+            path = os.path.join(ASSETS_DIR, asset_id)
+            if os.path.exists(path): os.remove(path)
+            m = [a for a in load_meta() if a["id"] != asset_id]
+            save_meta(m)
+            sys.stderr.write(f"[assets] deleted {asset_id}\n")
+            json_resp({"ok": True})
+            return
+
+        self.send_error(404)
 
     def _relay(self, status: int, headers, body: bytes):
         self.send_response(status)
