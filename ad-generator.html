@@ -349,6 +349,13 @@
                     <div class="text-muted" x-text="job.label"></div>
                     <div class="flex gap-2 mt-2 flex-wrap" x-show="job.status === 'completed'">
                       <button class="btn btn-secondary text-xs py-1 px-2" @click="downloadJob(job)">Download</button>
+                      <button class="btn text-xs py-1 px-2 transition"
+                        :class="job.savedToHistory ? 'btn-secondary text-success' : 'btn-ghost'"
+                        :disabled="job.savedToHistory"
+                        @click="saveJobToHistory(job)">
+                        <span x-show="!job.savedToHistory">☆ Save</span>
+                        <span x-show="job.savedToHistory">✓ Saved</span>
+                      </button>
                       <button class="btn btn-ghost text-xs py-1 px-2" @click="copyPrompt(job)">Prompt</button>
                       <button class="btn btn-ghost text-xs py-1 px-2" @click="job.refineOpen = !job.refineOpen">↺ Improve</button>
                     </div>
@@ -2462,6 +2469,12 @@ function app() {
       } catch(e) {}
     },
 
+    async saveJobToHistory(job) {
+      await this.saveGenerationToHistory(job, this.genType);
+      job.savedToHistory = true;
+      this.notify('Saved to History.');
+    },
+
     async saveGenerationToHistory(job, genType) {
       if (!job.outputBlob && !job.outputUrl) return;
       try {
@@ -3037,7 +3050,7 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
               job.completedAt = Date.now();
               const imgBlob = this.base64ToBlob(result.base64, result.mimeType);
               job.outputBlob = imgBlob;
-              this.saveGenerationToHistory(job, this.genType);
+              // History saved manually via Save button
             } catch(e) {
               console.error('[gemini job]', e);
               job.status = 'failed';
@@ -3119,7 +3132,7 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
                 this.notify('Image ready, but CDN download blocked. Right-click → Save image as workaround.');
               }
 
-              this.saveGenerationToHistory(job, this.genType);
+              // History saved manually via Save button
             } catch(e) {
               console.error(e);
               job.status = 'failed';
