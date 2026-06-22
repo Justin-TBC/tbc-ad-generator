@@ -2808,7 +2808,8 @@ All text in image: German, written by a native German copywriter — short, punc
 TBC Orange #FA7B3C · TBC Sky #18044D · TBC Yellow #FFE026 · TBC Oat #FCF6E0
 Do NOT use any colour outside this list. Do not approximate.`;
 
-      const textRule = `TEXT: pixel-sharp, high-contrast, no blur, no anti-aliasing. Crisp vector-quality letterforms.`;
+      const textRule = `TEXT: pixel-sharp, high-contrast, no blur, no anti-aliasing. Crisp vector-quality letterforms.
+HEADLINE FONT: any headline or large display text must use a bold geometric sans-serif — wide open letterforms, large x-height, strong weight, clean terminals, strictly no serifs, no thin weights, no rounded styles. The visual character is Degular Display Bold: confident, wide, geometric, modern. This applies to every title-sized text element in the image.`;
 
       const copyRule = `COPY: native German copywriter — think in German, not translated from English. Short, punchy, colloquial.${copySamples ? ` Tone: ${copySamples}.` : ''}`;
 
@@ -2832,8 +2833,9 @@ Concept from reference: "${principle}"${refTags ? `. Visual character: ${refTags
 SUBSTITUTIONS — apply these to the reference structure:
 • Product → The Better Cat product from image 2${productCount > 1 ? '–' + (productCount + 1) : ''}
 • Background colour (if graphic) → from TBC palette: #FA7B3C · #18044D · #FFE026 · #FCF6E0 — pick whichever fits best${hasMascot ? `\n• Add The Better Cat Sphynx mascot ONLY if the reference shows a character or mascot` : ''}
-• All text → native German, Degural Display headline style
-• Typography: crisp, sharp, no blur, high contrast
+• All text → native German
+• Headlines → bold geometric sans-serif, wide letterforms, large x-height, Degular Display Bold style. No serifs, no thin weights.
+• Typography: pixel-sharp, high-contrast, no blur
 
 DO NOT apply a generic TBC template (orange background + mascot + icon grid) if the reference does not show that format.
 ${angleBlock}${productContext}
@@ -2934,7 +2936,9 @@ ${productLine}${mascotLine}${refLine}${angleBlock}${productContext}
 SCENE & COMPOSITION:
 ${scene.body}
 
-Visual style: Degural Display headlines (large, left-aligned), Arbeit body copy, bold colours.${mascotDesc}
+Visual style: bold colours, clean compositions.${mascotDesc}
+HEADLINE FONT: any headline or large display text must use a bold geometric sans-serif — wide open letterforms, large x-height, strong weight, no serifs, no thin weights. Degular Display Bold character: confident, wide, geometric. Every title-sized element must follow this.
+Body text: clean neutral sans-serif (Arbeit style), smaller, supporting role.
 
 EXACT BRAND COLOURS — pick 2-3 that best complement the product packaging. Do not always default to orange:
 - TBC Orange: #FA7B3C
