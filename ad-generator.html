@@ -577,7 +577,7 @@
             <button class="text-xs text-accent hover:underline" @click="$refs.bkMdInput.click()">+ Load .md file</button>
             <input type="file" accept=".md,.markdown,text/plain" class="hidden" x-ref="bkMdInput" @change="bkHandleMarkdown($event)">
           </div>
-          <textarea class="input font-mono text-xs" rows="6" x-model="brandKit.description" placeholder="Optional: Markdown notes about the brand. Used as additional context in prompts (max 1500 chars injected)."></textarea>
+          <textarea class="input font-mono text-xs" rows="6" x-model="brandKit.description" @blur="saveBrandGuide()" placeholder="Optional: Markdown notes about the brand. Used as additional context in prompts (max 1500 chars injected)."></textarea>
         </div>
 
         <!-- TONE + ANGLES + DO/DONT + COPY -->
@@ -1190,6 +1190,7 @@ function app() {
       name: 'The Better Cat',
       tagline: 'Craft Cat Food.',
       description: '',
+      descriptionServerId: null,
       logoImages: [],
       mascotImages: [],
       mascotDescription: '',
@@ -2158,6 +2159,10 @@ function app() {
           if (asset.category === 'logo')   this.brandKit.logoImages.push(entry);
           if (asset.category === 'mascot') this.brandKit.mascotImages.push(entry);
           if (asset.category === 'font')   this.brandKit.fontFiles.push(entry);
+          if (asset.category === 'brand-guide' && entry.blob) {
+            this.brandKit.description = await entry.blob.text();
+            this.brandKit.descriptionServerId = asset.id;
+          }
         }
         if (assets.length > 0) console.log(`[assets] restored ${assets.length} brand assets`);
       } catch(e) { console.warn('[assets] restore failed:', e.message); }
@@ -2170,12 +2175,27 @@ function app() {
         const existing = this.brandKit.description?.trim();
         if (existing && !confirm('Replace existing description? OK = replace, Cancel = append.')) {
           this.brandKit.description = existing + '\n\n---\n\n' + text;
-          return;
+        } else {
+          this.brandKit.description = text;
         }
-        this.brandKit.description = text;
         this.notify(`${f.name} loaded (${Math.round(text.length/1024)} kB).`);
+        this.saveBrandGuide();
       });
       event.target.value = '';
+    },
+
+    async saveBrandGuide() {
+      const text = this.brandKit.description?.trim();
+      if (!text) return;
+      // Replace existing stored version
+      if (this.brandKit.descriptionServerId) {
+        await this.deleteAsset(this.brandKit.descriptionServerId);
+        this.brandKit.descriptionServerId = null;
+      }
+      const blob = new Blob([text], { type: 'text/markdown' });
+      const file = new File([blob], 'brand-guide.md', { type: 'text/markdown' });
+      const id = await this.persistAsset(file, 'brand-guide');
+      if (id) this.brandKit.descriptionServerId = id;
     },
 
     // ---- Products ----
