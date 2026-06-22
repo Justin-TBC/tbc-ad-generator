@@ -213,6 +213,20 @@
             </div>
           </div>
 
+          <!-- Mirror toggle (when reference selected) -->
+          <div x-show="generateForm.referenceIds.length > 0" class="flex items-center gap-3 p-3 rounded-lg border border-bg-border bg-bg-elev">
+            <div class="flex-1">
+              <div class="text-xs font-semibold text-zinc-100">Mirror reference</div>
+              <div class="text-xs text-muted mt-0.5" x-text="generateForm.mirrorRef ? 'Copy the reference layout exactly — only swap the product. Best result for layout transfer.' : 'Apply TBC brand style inspired by the reference. More creative freedom.'"></div>
+            </div>
+            <button class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+              :class="generateForm.mirrorRef ? 'bg-accent' : 'bg-bg-border'"
+              @click="generateForm.mirrorRef = !generateForm.mirrorRef">
+              <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200"
+                :class="generateForm.mirrorRef ? 'translate-x-4' : 'translate-x-0'"></span>
+            </button>
+          </div>
+
           <!-- Mode (ads only, multi-ref) -->
           <div x-show="genType === 'ads' && generateForm.referenceIds.length > 1">
             <label class="label">Mode</label>
@@ -1307,6 +1321,7 @@ function app() {
       count: 1,
       customPrompt: '',
       sendImages: true,
+      mirrorRef: true,  // Mirror mode: copy reference exactly, just swap product
     },
 
     shopTemplates: [
@@ -2741,6 +2756,33 @@ function app() {
       return `\n\nPRODUCTS IN THIS AD:\n${lines.join('\n')}`;
     },
 
+    buildMirrorPrompt(reference) {
+      // Ultra-minimal prompt: copy reference exactly, only swap product
+      const kit = this.brandKit;
+      const productCount = this.selectedProducts.map(p => p.images?.[0]?.blob).filter(Boolean).length || 1;
+      const ordinals = ['FIRST','SECOND','THIRD','FOURTH','FIFTH'];
+      const refIdx = productCount; // reference comes right after product(s), no mascot sent
+      const productLine = productCount === 1
+        ? `Image 1 is The Better Cat product — preserve its packaging and label typography exactly.`
+        : `Images 1–${productCount} are The Better Cat products — preserve packaging exactly.`;
+      const angle = this.generateForm.angle ? `\nFocus angle: "${this.generateForm.angle}".` : '';
+      return `Recreate image ${refIdx + 1} exactly, but replace the product with The Better Cat product from image 1.
+
+${productLine}
+Image ${refIdx + 1} is the REFERENCE — copy it precisely:
+• Same background (colour, texture, photo or graphic — do not change)
+• Same number of products shown (if reference shows 1 sachet, show 1 sachet)
+• Same composition, framing, camera angle, lighting
+• Same types of text elements and where they sit
+• Same overall format (lifestyle photo stays lifestyle photo, flat lay stays flat lay)
+• Do NOT add any element not present in the reference (no mascot, no icons, no badges unless the reference shows them)
+• Do NOT apply a generic "brand template" — follow the reference
+
+Only change: replace the product with The Better Cat product. Apply these exact brand colours to any graphic elements: TBC Orange #FA7B3C · TBC Sky #18044D · TBC Yellow #FFE026 · TBC Oat #FCF6E0.
+
+All text in image: German, written by a native German copywriter — short, punchy, colloquial. No translated English phrases.${angle}`;
+    },
+
     buildPrompt(reference) {
       const kit = this.brandKit;
       const tone = (kit.toneAdjectives||[]).join(', ') || 'energetic, playful, bold';
@@ -2999,7 +3041,8 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
             try {
               job.status = 'in_progress';
               const refForJob = job.refs[0] || null;
-              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
+              const useMirror = !job.template && refForJob && f.mirrorRef;
+              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : (useMirror ? this.buildMirrorPrompt(refForJob) : this.buildPrompt(refForJob));
               const extras = f.customPrompt?.trim();
               const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS ===\n${extras}` : basePrompt;
               job.prompt = prompt;
@@ -3007,8 +3050,11 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
               const tplObj = job.template ? this.shopTemplates.find(t => t.id===job.template) : null;
               job.aspect = tplObj?.aspect || f.aspect;
 
+              // Mirror: reference first → product, no mascot. Standard: product → mascot → ref
               const imageBlobs = f.sendImages
-                ? [...productBlobs, ...mascotBlobs, ...job.refs.map(r=>r.imageBlob).filter(Boolean)]
+                ? (useMirror && job.refs.length > 0
+                    ? [...job.refs.map(r=>r.imageBlob).filter(Boolean), ...productBlobs]
+                    : [...productBlobs, ...mascotBlobs, ...job.refs.map(r=>r.imageBlob).filter(Boolean)])
                 : [];
 
               const result = await this.geminiGenerate(prompt, imageBlobs);
@@ -3048,13 +3094,22 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
             try {
               job.status = 'queued';
               const refForJob = job.refs[0] || null;
-              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
+              const useMirror = !job.template && refForJob && f.mirrorRef;
+              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : (useMirror ? this.buildMirrorPrompt(refForJob) : this.buildPrompt(refForJob));
               const extras = f.customPrompt?.trim();
               const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS (high priority) ===\n${extras}` : basePrompt;
               job.prompt = prompt;
 
-              const jobMediaIds = [...productMediaIds, ...mascotMediaIds];
-              for (const r of job.refs) { const mid = refMediaIdMap.get(r.imageBlob); if (mid) jobMediaIds.push(mid); }
+              // Mirror mode: reference first → product → no mascot (mascot image biases model away from reference)
+              // Standard mode: product → mascot → reference
+              let jobMediaIds;
+              if (useMirror && job.refs.length > 0) {
+                const refMids = job.refs.map(r => refMediaIdMap.get(r.imageBlob)).filter(Boolean);
+                jobMediaIds = [...refMids, ...productMediaIds]; // ref first, no mascot
+              } else {
+                jobMediaIds = [...productMediaIds, ...mascotMediaIds];
+                for (const r of job.refs) { const mid = refMediaIdMap.get(r.imageBlob); if (mid) jobMediaIds.push(mid); }
+              }
 
               const tplObj = job.template ? this.shopTemplates.find(t=>t.id===job.template) : null;
               const jobAspect = tplObj?.aspect || f.aspect;
