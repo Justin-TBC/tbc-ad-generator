@@ -15,10 +15,13 @@ import json
 import os
 import socketserver
 import sys
+import threading
 import uuid
 import urllib.request
 import urllib.error
 from urllib.parse import urlparse, parse_qs
+
+_ASSETS_LOCK = threading.Lock()
 
 UPSTREAM_BASE  = "https://mcp.higgsfield.ai"
 DEFAULT_PORT   = int(os.environ.get("PORT", 8000))
@@ -470,9 +473,10 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
             data     = self.rfile.read(length) if length else b""
             with open(os.path.join(ASSETS_DIR, asset_id), "wb") as f:
                 f.write(data)
-            m = load_meta()
-            m.append({"id": asset_id, "name": name, "category": category, "mime": mime})
-            save_meta(m)
+            with _ASSETS_LOCK:
+                m = load_meta()
+                m.append({"id": asset_id, "name": name, "category": category, "mime": mime})
+                save_meta(m)
             sys.stderr.write(f"[assets] saved {asset_id} ({len(data)} bytes, cat={category})\n")
             json_resp({"ok": True, "id": asset_id})
             return
@@ -505,8 +509,9 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
                 self.send_error(400); return
             path = os.path.join(ASSETS_DIR, asset_id)
             if os.path.exists(path): os.remove(path)
-            m = [a for a in load_meta() if a["id"] != asset_id]
-            save_meta(m)
+            with _ASSETS_LOCK:
+                m = [a for a in load_meta() if a["id"] != asset_id]
+                save_meta(m)
             sys.stderr.write(f"[assets] deleted {asset_id}\n")
             json_resp({"ok": True})
             return
