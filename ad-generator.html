@@ -108,12 +108,19 @@
         <!-- LEFT: BRIEF FORM -->
         <div class="card p-5 space-y-5 self-start sticky top-0">
 
-          <!-- Backend indicator chip -->
+          <!-- Backend indicator + Quick/Quality toggle -->
           <div class="flex items-center justify-between">
             <span class="text-xs text-muted font-semibold uppercase tracking-wider">Brief</span>
-            <button @click="view='settings'" class="chip cursor-pointer hover:opacity-80 transition"
-              :class="settings.imageBackend==='google' ? 'chip-blue' : 'chip-accent'"
-              x-text="settings.imageBackend==='google' ? '⚡ Google Gemini' : '⚡ Higgsfield'"></button>
+            <div class="flex items-center gap-2">
+              <div class="flex gap-1 p-0.5 bg-bg-elev rounded border border-bg-border">
+                <button class="px-2 py-0.5 rounded text-xs font-medium transition"
+                  :class="settings.imageBackend==='google' ? 'bg-blue-600 text-white' : 'text-muted hover:text-zinc-100'"
+                  @click="settings.imageBackend='google'; saveSettings()" title="Google Gemini — ~15 sec, good for iteration">⚡ Quick</button>
+                <button class="px-2 py-0.5 rounded text-xs font-medium transition"
+                  :class="settings.imageBackend!=='google' ? 'bg-accent text-bg' : 'text-muted hover:text-zinc-100'"
+                  @click="settings.imageBackend='higgsfield'; saveSettings()" title="Higgsfield — 5-15 min, highest quality">✦ Quality</button>
+              </div>
+            </div>
           </div>
 
           <!-- Angle selector -->
@@ -3087,17 +3094,14 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
         }
 
         const f = this.generateForm;
-        const kit = this.brandKit;
-        await this.fetchProductImageBlobs();
-        const productBlobs = this.selectedProducts.flatMap(p => (p.images||[]).map(img=>img.blob).filter(Boolean));
-        const mascotBlobs = (kit?.mascotImages||[]).map(m => m.blob);
+        // For refinement we only need the output image — no re-upload of products/mascot.
+        // The model edits the existing output, product identity is preserved by the output itself.
+        const prompt = `Refine this image based on user feedback.\n\nFEEDBACK:\n${feedback}\n\nApply this as a targeted edit. Keep overall composition, brand colors, product packaging, and mascot design exactly as shown unless the feedback explicitly says to change them. All text in the image must be in German. Output a single refined version.`;
+        job.prompt = prompt;
 
         if (this.settings.imageBackend === 'google') {
-          const imageBlobs = [outputBlob, ...productBlobs, ...mascotBlobs].filter(Boolean);
-          const prompt = `Refine this image based on user feedback.\n\nFEEDBACK:\n${feedback}\n\nKeep composition, brand colors, product accuracy, and mascot identity exactly the same unless feedback explicitly says to change them. Output a single refined version.`;
-          job.prompt = prompt;
           job.status = 'in_progress';
-          const result = await this.geminiGenerate(prompt, imageBlobs);
+          const result = await this.geminiGenerate(prompt, [outputBlob].filter(Boolean));
           const dataUrl = `data:${result.mimeType};base64,${result.base64}`;
           job.outputUrl = dataUrl;
           job.status = 'completed';
@@ -3106,20 +3110,8 @@ ${scene.text} Copy language: GERMAN. All text in the image must be in German. Re
           job.outputBlob = imgBlob;
           this.saveGenerationToHistory(job, this.genType);
         } else {
-          const allBlobs = [outputBlob, ...productBlobs, ...mascotBlobs].filter(Boolean);
-          this.currentStep = `Uploading ${allBlobs.length} images…`;
-          const mediaIds = await this.hfUploadImages(allBlobs);
-
-          let anchorDesc = '';
-          if (productBlobs.length > 0 && mascotBlobs.length > 0) {
-            anchorDesc = `Images 2-${1+productBlobs.length} are the brand's product (preserve packaging exactly). Images ${2+productBlobs.length}-${1+productBlobs.length+mascotBlobs.length} are the brand mascot (preserve character design exactly).`;
-          } else if (productBlobs.length > 0) {
-            anchorDesc = `Images 2-${1+productBlobs.length} are the brand's product (preserve packaging exactly).`;
-          } else if (mascotBlobs.length > 0) {
-            anchorDesc = `Image${mascotBlobs.length > 1 ? 's 2-'+(1+mascotBlobs.length) : ' 2'} ${mascotBlobs.length > 1 ? 'are' : 'is'} the brand mascot (preserve character design exactly).`;
-          }
-
-          const prompt = `Refine the FIRST image based on user feedback. ${anchorDesc}\n\nUSER FEEDBACK:\n${feedback}\n\nApply this feedback as a targeted edit. Keep composition, layout, brand colors, product accuracy, and mascot identity the same unless feedback says otherwise. All text in the image must be in German, left-aligned, max 1-2 lines.`;
+          this.currentStep = 'Uploading output image…';
+          const mediaIds = await this.hfUploadImages([outputBlob].filter(Boolean));
           job.prompt = prompt;
           const refineAspect = parentJob.aspect || parentJob.requestBody?.aspect_ratio || f.aspect;
           const requestBody = { prompt, aspect_ratio:refineAspect, mediaIds:[...mediaIds], count:1 };
