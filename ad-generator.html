@@ -952,10 +952,13 @@
       </div>
       <div class="grid grid-cols-3 gap-4">
         <template x-for="item in generationHistory" :key="item.id">
-          <div class="card overflow-hidden">
+          <div class="card overflow-hidden group relative">
             <div class="aspect-square bg-bg-elev">
               <img :src="item.imageUrl" class="w-full h-full object-cover" loading="lazy">
             </div>
+            <!-- Delete button — top right on hover -->
+            <button class="absolute top-2 right-2 w-7 h-7 rounded-full bg-danger text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center"
+              @click="deleteHistoryItem(item.id)" title="Remove from history">✕</button>
             <div class="p-3">
               <div class="text-sm font-medium text-zinc-100 truncate" x-text="item.label"></div>
               <div class="flex items-center gap-2 mt-1">
@@ -2508,6 +2511,16 @@ function app() {
       this.ownReferences.push(ref);
       this.notify(`Saved "${item.label.slice(0,30)}" to Own Ads.`);
       this.saveReferenceAssets();
+    },
+
+    async deleteHistoryItem(id) {
+      const idx = this.generationHistory.findIndex(h => h.id === id);
+      if (idx < 0) return;
+      const item = this.generationHistory[idx];
+      if (item.serverId) this.deleteAsset(item.serverId);
+      this.generationHistory.splice(idx, 1);
+      await this.saveMeta('generations', this.generationHistory);
+      this.notify('Removed from History.');
     },
 
     // ============================================================
