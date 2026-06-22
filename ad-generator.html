@@ -349,6 +349,7 @@
                     <div class="text-muted" x-text="job.label"></div>
                     <div class="flex gap-2 mt-2 flex-wrap" x-show="job.status === 'completed'">
                       <button class="btn btn-secondary text-xs py-1 px-2" @click="downloadJob(job)">Download</button>
+                      <button class="btn btn-ghost text-xs py-1 px-2" @click="openTextOverlay(job)">✎ Text</button>
                       <button class="btn btn-ghost text-xs py-1 px-2" @click="copyPrompt(job)">Prompt</button>
                       <button class="btn btn-ghost text-xs py-1 px-2" @click="job.refineOpen = !job.refineOpen">↺ Improve</button>
                     </div>
@@ -424,6 +425,86 @@
           <div class="px-6 py-4 border-t border-bg-border flex items-center justify-between">
             <div class="text-sm text-muted" x-text="generateForm.referenceIds.length + ' selected'"></div>
             <button class="btn btn-primary" @click="refPickerOpen = false">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TEXT OVERLAY MODAL -->
+      <div x-show="textOverlay.open" x-transition.opacity class="fixed inset-0 z-50 modal-bg flex items-start justify-center overflow-y-auto py-8" @click.self="textOverlay.open=false">
+        <div class="card w-full max-w-2xl mx-4 my-auto" @click.stop>
+          <div class="px-6 py-4 border-b border-bg-border flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-zinc-100">Add Text with Brand Font</h2>
+            <button class="btn btn-ghost p-1" @click="textOverlay.open=false">✕</button>
+          </div>
+          <div class="p-6 space-y-4">
+            <!-- Preview -->
+            <div class="relative bg-bg-elev rounded-lg overflow-hidden" style="max-height:300px">
+              <img x-show="textOverlay.job?.outputUrl" :src="textOverlay.job?.outputUrl" class="w-full object-contain">
+            </div>
+
+            <!-- Text lines -->
+            <template x-for="(line, li) in textOverlay.lines" :key="li">
+              <div class="card p-3 space-y-2">
+                <div class="flex gap-2">
+                  <input class="input flex-1" x-model="line.text" :placeholder="li===0 ? 'Headline text…' : 'Second line…'">
+                  <button x-show="textOverlay.lines.length > 1" class="btn btn-ghost text-danger px-2" @click="textOverlay.lines.splice(li,1)">✕</button>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                  <div>
+                    <label class="label">Font</label>
+                    <select class="input text-xs" x-model.number="line.fontIdx">
+                      <option :value="0" x-show="brandKit.fontFiles.length===0">System Bold</option>
+                      <template x-for="(ff, fi) in brandKit.fontFiles" :key="fi">
+                        <option :value="fi" x-text="ff.label || ff.name"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="label">Size (px)</label>
+                    <input type="number" class="input text-xs" x-model.number="line.size" min="20" max="300" step="4">
+                  </div>
+                  <div>
+                    <label class="label">Colour</label>
+                    <div class="flex gap-1">
+                      <input type="color" class="w-9 h-9 rounded border border-bg-border bg-bg-elev cursor-pointer flex-shrink-0" x-model="line.color">
+                      <input class="input font-mono text-xs" x-model="line.color">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <button class="btn btn-ghost text-xs" @click="textOverlay.lines.push({text:'',size:50,color:'#FFFFFF',fontIdx:0})">+ Add line</button>
+
+            <!-- Position -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="label">Position</label>
+                <select class="input" x-model="textOverlay.position">
+                  <option value="top-left">Top left</option>
+                  <option value="top-center">Top center</option>
+                  <option value="bottom-left">Bottom left</option>
+                  <option value="bottom-center">Bottom center</option>
+                  <option value="center-left">Middle left</option>
+                  <option value="center-center">Center</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Padding (px)</label>
+                <input type="number" class="input" x-model.number="textOverlay.padding" min="0" max="200" step="8">
+              </div>
+            </div>
+
+            <div x-show="brandKit.fontFiles.length===0" class="text-xs text-danger">
+              No fonts uploaded yet — go to Brand Kit → Fonts to upload your font files.
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-bg-border flex gap-2 justify-end">
+            <button class="btn btn-secondary" @click="textOverlay.open=false">Cancel</button>
+            <button class="btn btn-primary" :disabled="textOverlay.applying || !textOverlay.lines.some(l=>l.text.trim())" @click="applyTextOverlay()">
+              <span x-show="!textOverlay.applying">Apply & Download</span>
+              <span x-show="textOverlay.applying">Rendering…</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1205,6 +1286,12 @@ function app() {
     productFilter: 'All',
     metaSearch: {
       query: '', country: 'DE', loading: false, results: [], error: '', hasMore: false, nextCursor: null,
+    },
+    textOverlay: {
+      open: false, job: null,
+      lines: [{ text: '', size: 80, color: '#FFFFFF', fontIdx: 0 }],
+      position: 'bottom-left', padding: 60,
+      applying: false,
     },
 
     // ---- State: references, products ----
@@ -2080,6 +2167,95 @@ function app() {
 
     uid() {
       return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+    },
+
+    // ============================================================
+    // TEXT OVERLAY (renders brand fonts onto generated image via canvas)
+    // ============================================================
+    openTextOverlay(job) {
+      this.textOverlay = {
+        open: true, job,
+        lines: [{ text: '', size: 80, color: '#FFFFFF', fontIdx: 0 }],
+        position: 'bottom-left', padding: 60, applying: false,
+      };
+    },
+
+    async loadBrandFont(fontFile) {
+      const familyName = (fontFile.label || fontFile.name).replace(/\.[^.]+$/, '');
+      if (document.fonts && [...document.fonts].some(f => f.family === familyName)) return familyName;
+      try {
+        const blob = fontFile.blob || (fontFile.url ? await fetch(fontFile.url).then(r => r.blob()) : null);
+        if (!blob) return null;
+        const url = URL.createObjectURL(blob);
+        const face = new FontFace(familyName, `url(${url})`);
+        await face.load();
+        document.fonts.add(face);
+        return familyName;
+      } catch(e) { console.warn('[font] load failed:', e.message); return null; }
+    },
+
+    async applyTextOverlay() {
+      const { job, lines, position, padding } = this.textOverlay;
+      if (!job?.outputUrl) return;
+      this.textOverlay.applying = true;
+      try {
+        // Load all required fonts
+        const fontFamilies = [];
+        for (const line of lines) {
+          const ff = this.brandKit.fontFiles[line.fontIdx];
+          if (ff) {
+            const family = await this.loadBrandFont(ff);
+            fontFamilies.push(family);
+          } else {
+            fontFamilies.push(null);
+          }
+        }
+
+        // Draw image onto canvas
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = job.outputUrl; });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        // Calculate starting position for text block
+        const lineHeight = 1.15;
+        const totalLines = lines.filter(l => l.text.trim());
+        const totalHeight = totalLines.reduce((h, l) => h + l.size * lineHeight, 0);
+
+        const [yAnchor, xAnchor] = position.split('-');
+        let startY;
+        if (yAnchor === 'top')    startY = padding + (totalLines[0]?.size || 80);
+        else if (yAnchor === 'bottom') startY = canvas.height - padding - totalHeight + (totalLines[0]?.size || 80);
+        else startY = (canvas.height - totalHeight) / 2 + (totalLines[0]?.size || 80);
+
+        let y = startY;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.text.trim()) continue;
+          const family = fontFamilies[i] || 'system-ui, sans-serif';
+          ctx.font = `${line.size}px "${family}"`;
+          ctx.fillStyle = line.color;
+          ctx.textAlign = xAnchor === 'center' ? 'center' : 'left';
+          const x = xAnchor === 'center' ? canvas.width / 2 : padding;
+          ctx.fillText(line.text, x, y);
+          y += line.size * lineHeight;
+        }
+
+        // Export
+        const outBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        this.autoDownload(outBlob, `tbc_${job.label.replace(/\s+/g,'-')}_text.png`);
+        this.textOverlay.open = false;
+        this.notify('Image with text downloaded.');
+      } catch(e) {
+        console.error('[textOverlay]', e);
+        this.notify('Text render failed: ' + e.message, 'error');
+      } finally {
+        this.textOverlay.applying = false;
+      }
     },
 
     autoDownload(blob, filename) {
