@@ -1485,9 +1485,11 @@ function app() {
       this.loadBrandAssets();
       this.loadReferenceAssets();
       this.loadGenerationHistory();
+      // Restore persisted products first, then sync new ones from Shopify
+      await this.loadProductAssets();
       // Load brand config from Notion (non-blocking, retries once after 3s if proxy is mid-deploy)
       this.loadNotionConfig().catch(() => setTimeout(() => this.loadNotionConfig(), 3000));
-      // Sync products from Shopify (non-blocking, retries once after 3s)
+      // Sync only NEW products from Shopify (non-blocking)
       this.loadShopifyProducts().catch(() => setTimeout(() => this.loadShopifyProducts(), 3000));
     },
 
@@ -1672,8 +1674,11 @@ function app() {
         };
         const existingIdx = this.products.findIndex(p => p.id === mappedId);
         if (existingIdx >= 0) {
-          if (this.products[existingIdx].fromShopify) {
-            const existingImages = this.products[existingIdx].images || [];
+          // Never overwrite a product that was loaded from Volume (user may have curated images)
+          // Just preserve any blobs already fetched this session
+          const existing = this.products[existingIdx];
+          if (!existing._persisted) {
+            const existingImages = existing.images || [];
             mapped.images = mapped.images.map(img => {
               const prev = existingImages.find(e => e.id === img.id);
               return prev?.blob ? { ...img, blob: prev.blob } : img;
@@ -1730,6 +1735,7 @@ function app() {
         this.shopifyStatus = 'ok';
         const synced = this.products.filter(p => p.fromShopify).length;
         console.log(`[shopify] Synced ${synced} products across ${matched.length} collections`);
+        this.saveProductAssets();
       } catch(e) {
         if (e.message !== 'shopify_auth_failed') {
           this.shopifyStatus = 'error';
@@ -2263,6 +2269,7 @@ function app() {
       }
       this.closeProductModal();
       this.notify('Product saved.');
+      this.saveProductAssets();
     },
 
     deleteProduct() {
@@ -2271,6 +2278,34 @@ function app() {
       if (idx >= 0) { this.products.splice(idx, 1); this.generateForm.productIds = this.generateForm.productIds.filter(id => id !== this.productModal.product.id); }
       this.closeProductModal();
       this.notify('Product deleted.');
+      this.saveProductAssets();
+    },
+
+    // ---- Product persistence ----
+    async saveProductAssets() {
+      const serialized = this.products.map(p => ({
+        id: p.id, title: p.title, category: p.category,
+        // Store image URLs only (no blobs — fetched lazily at generation time)
+        images: (p.images || []).map(img => ({ id: img.id, url: img.url, name: img.name })),
+        description: p.description || '', flavor: p.flavor || '', ageRange: p.ageRange || '',
+        keyIngredients: p.keyIngredients || [], nutritionNotes: p.nutritionNotes || '',
+        fromShopify: p.fromShopify || false, shopifyCollection: p.shopifyCollection || '',
+        _persisted: true,
+      }));
+      await this.saveMeta('products', serialized);
+    },
+
+    async loadProductAssets() {
+      try {
+        const saved = await this.loadMeta('products');
+        if (!Array.isArray(saved) || saved.length === 0) return;
+        // Restore products — mark as persisted so Shopify sync won't overwrite them
+        for (const p of saved) {
+          const exists = this.products.find(x => x.id === p.id);
+          if (!exists) this.products.push({ ...p, _persisted: true });
+        }
+        console.log(`[products] restored ${saved.length} products from Volume`);
+      } catch(e) { console.warn('[products] restore failed:', e.message); }
     },
 
     // ---- References ----
