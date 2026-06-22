@@ -213,20 +213,6 @@
             </div>
           </div>
 
-          <!-- Mirror toggle (when reference selected) -->
-          <div x-show="generateForm.referenceIds.length > 0" class="flex items-center gap-3 p-3 rounded-lg border border-bg-border bg-bg-elev">
-            <div class="flex-1">
-              <div class="text-xs font-semibold text-zinc-100">Mirror reference</div>
-              <div class="text-xs text-muted mt-0.5" x-text="generateForm.mirrorRef ? 'Copy the reference layout exactly — only swap the product. Best result for layout transfer.' : 'Apply TBC brand style inspired by the reference. More creative freedom.'"></div>
-            </div>
-            <button class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-              :class="generateForm.mirrorRef ? 'bg-accent' : 'bg-bg-border'"
-              @click="generateForm.mirrorRef = !generateForm.mirrorRef">
-              <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200"
-                :class="generateForm.mirrorRef ? 'translate-x-4' : 'translate-x-0'"></span>
-            </button>
-          </div>
-
           <!-- Mode (ads only, multi-ref) -->
           <div x-show="genType === 'ads' && generateForm.referenceIds.length > 1">
             <label class="label">Mode</label>
@@ -2827,48 +2813,32 @@ Do NOT use any colour outside this list. Do not approximate.`;
       const copyRule = `COPY: native German copywriter — think in German, not translated from English. Short, punchy, colloquial.${copySamples ? ` Tone: ${copySamples}.` : ''}`;
 
       if (reference) {
-        // Reference-led prompt: the reference layout is the primary driver
-        return `You are creating a The Better Cat premium cat food ad (${this.generateForm.aspect}).
+        // Reference defines format/type/composition. Brand identity applied on top.
+        // Image order: reference FIRST so model anchors on it, then product. No mascot — it biases toward graphic style.
+        return `Create a The Better Cat ad (${this.generateForm.aspect}).
 
-IMAGE INPUTS:
-${productLine}${mascotLine}
-The ${ordinals[refIdx]} image is the REFERENCE LAYOUT to replicate.
+Image 1 is the FORMAT REFERENCE — it defines the type, composition and concept of this ad.
+Image${productCount > 1 ? 's 2–' + (productCount + 1) : ' 2'} ${productCount > 1 ? 'are' : 'is'} The Better Cat product — preserve packaging and label typography exactly.
 
-━━━ STEP 1: ANALYSE THE REFERENCE ━━━
-Study image ${refIdx + 1} carefully and note:
-• Exactly how many products appear and how they are arranged (single sachet / stack / flat lay / etc.)
-• Whether a character or mascot appears — and where
-• Text placement: where is the headline? body text? any badges or callouts?
-• Background: solid colour, gradient, photo, or graphic?
-• Graphic elements present: icons, circles, dividers, stickers — list them
-• Overall format: lifestyle / product-only / split panel / graphic / collage / etc.
+FORMAT LAW — read image 1 and determine:
+• Is this a lifestyle photo, a graphic design, a product flat lay, a split panel, or something else? → produce that SAME TYPE. Do not switch.
+• How many products are shown? → show exactly that many.
+• What is the background (photo, solid colour, white, etc.)? → match it.
+• Where is the text (top / bottom / overlay / side)? → place text in the same zone.
+• What graphic elements exist (badges, icons, dividers)? → include only those, no others.
 
-━━━ STEP 2: REPRODUCE THAT EXACT STRUCTURE ━━━
-Use the reference as a precise template. Substitute only these elements:
-• Product(s) → The Better Cat product from image(s) 1${productCount > 1 ? '–' + productCount : ''}
-  — match the QUANTITY shown in the reference (if reference shows 1 product, show 1 product)
-• Character → ${hasMascot ? `the Sphynx mascot from image ${mascotStartIdx + 1} — only include if reference shows a character` : 'only add a Sphynx cat if the reference shows a character/mascot'}
-• Colours → TBC brand palette (see below), chosen to complement the product
-• Copy → native German headline in the same position as the reference text
+Concept from reference: "${principle}"${refTags ? `. Visual character: ${refTags}.` : ''}
 
-━━━ HARD CONSTRAINTS — DO NOT ADD these unless the reference shows them ━━━
-✗ Do NOT add a mascot if reference has no character
-✗ Do NOT add circular fact badges if reference has none
-✗ Do NOT add icon grids if reference has none
-✗ Do NOT stack multiple products if reference shows one
-✗ Do NOT add a full-bleed orange background if reference uses a different background
-✗ Do NOT invent graphic elements not present in the reference
+SUBSTITUTIONS — apply these to the reference structure:
+• Product → The Better Cat product from image 2${productCount > 1 ? '–' + (productCount + 1) : ''}
+• Background colour (if graphic) → from TBC palette: #FA7B3C · #18044D · #FFE026 · #FCF6E0 — pick whichever fits best${hasMascot ? `\n• Add The Better Cat Sphynx mascot ONLY if the reference shows a character or mascot` : ''}
+• All text → native German, Degural Display headline style
+• Typography: crisp, sharp, no blur, high contrast
 
-Layout concept: "${principle}"${refTags ? ` · tags: ${refTags}` : ''}
+DO NOT apply a generic TBC template (orange background + mascot + icon grid) if the reference does not show that format.
 ${angleBlock}${productContext}
-
-${brandColours}
-${textRule}
-Do:\n${dos || '- bold contrast, strong focal point'}
-Don't:\n${donts || '- generic layout, passive imagery'}
-${brandContext}
-${copyRule}
-All text: GERMAN. No drop shadows or gradients on type.${mascotDesc ? '\n' + mascotDesc : ''}`;
+Exact colours — reproduce hex precisely: TBC Orange #FA7B3C · TBC Sky #18044D · TBC Yellow #FFE026 · TBC Oat #FCF6E0. No other colours.
+TEXT: pixel-sharp, high-contrast. COPY: native German, not translated — short, punchy, colloquial.${brandContext}`;
       }
 
       // No reference — open creative brief
@@ -2877,12 +2847,12 @@ All text: GERMAN. No drop shadows or gradients on type.${mascotDesc ? '\n' + mas
 ${productLine}${mascotLine}
 ${angleBlock}${productContext}
 
-Create a bold, varied composition. Do NOT default to orange-background-mascot-icons — explore different formats: lifestyle scene, product close-up, typographic hero, split panel.
+Explore a varied composition — lifestyle scene, product close-up, typographic hero, or split panel. Do NOT default to orange-background-mascot-icons layout.
 
 ${brandColours}
 ${textRule}
 Do:\n${dos || '- bold contrast, strong focal point, varied layouts'}
-Don't:\n${donts || '- generic repetitive layouts'}
+Don't:\n${donts || '- generic repetitive template layouts'}
 ${brandContext}
 ${copyRule}
 All text: GERMAN. No drop shadows or gradients on type.${mascotDesc ? '\n' + mascotDesc : ''}`;
@@ -3041,8 +3011,7 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
             try {
               job.status = 'in_progress';
               const refForJob = job.refs[0] || null;
-              const useMirror = !job.template && refForJob && f.mirrorRef;
-              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : (useMirror ? this.buildMirrorPrompt(refForJob) : this.buildPrompt(refForJob));
+              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
               const extras = f.customPrompt?.trim();
               const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS ===\n${extras}` : basePrompt;
               job.prompt = prompt;
@@ -3050,9 +3019,9 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
               const tplObj = job.template ? this.shopTemplates.find(t => t.id===job.template) : null;
               job.aspect = tplObj?.aspect || f.aspect;
 
-              // Mirror: reference first → product, no mascot. Standard: product → mascot → ref
+              // Ref present: reference first → product (no mascot). No ref: product → mascot.
               const imageBlobs = f.sendImages
-                ? (useMirror && job.refs.length > 0
+                ? (job.refs.length > 0
                     ? [...job.refs.map(r=>r.imageBlob).filter(Boolean), ...productBlobs]
                     : [...productBlobs, ...mascotBlobs, ...job.refs.map(r=>r.imageBlob).filter(Boolean)])
                 : [];
@@ -3094,21 +3063,19 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
             try {
               job.status = 'queued';
               const refForJob = job.refs[0] || null;
-              const useMirror = !job.template && refForJob && f.mirrorRef;
-              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : (useMirror ? this.buildMirrorPrompt(refForJob) : this.buildPrompt(refForJob));
+              const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
               const extras = f.customPrompt?.trim();
               const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS (high priority) ===\n${extras}` : basePrompt;
               job.prompt = prompt;
 
-              // Mirror mode: reference first → product → no mascot (mascot image biases model away from reference)
-              // Standard mode: product → mascot → reference
+              // When reference present: ref first → product (no mascot — mascot image biases model toward graphic template)
+              // When no reference: product → mascot
               let jobMediaIds;
-              if (useMirror && job.refs.length > 0) {
+              if (job.refs.length > 0) {
                 const refMids = job.refs.map(r => refMediaIdMap.get(r.imageBlob)).filter(Boolean);
-                jobMediaIds = [...refMids, ...productMediaIds]; // ref first, no mascot
+                jobMediaIds = [...refMids, ...productMediaIds];
               } else {
                 jobMediaIds = [...productMediaIds, ...mascotMediaIds];
-                for (const r of job.refs) { const mid = refMediaIdMap.get(r.imageBlob); if (mid) jobMediaIds.push(mid); }
               }
 
               const tplObj = job.template ? this.shopTemplates.find(t=>t.id===job.template) : null;
