@@ -332,7 +332,7 @@
             <div class="grid grid-cols-2 gap-3">
               <template x-for="(job, idx) in currentRun?.jobs || []" :key="idx">
                 <div class="card overflow-hidden">
-                  <div class="aspect-square bg-bg-elev relative">
+                  <div class="bg-bg-elev relative w-full" :style="'aspect-ratio:' + (job.aspect||generateForm.aspect||'1:1').replace(':','/')">
                     <template x-if="job.status === 'completed' && job.outputUrl">
                       <img :src="job.outputUrl" class="w-full h-full object-cover">
                     </template>
@@ -952,7 +952,7 @@
       <div class="grid grid-cols-3 gap-4">
         <template x-for="item in generationHistory" :key="item.id">
           <div class="card overflow-hidden group relative">
-            <div class="aspect-square bg-bg-elev">
+            <div class="bg-bg-elev w-full" :style="'aspect-ratio:' + (item.aspect||'4:5').replace(':','/')">
               <img :src="item.imageUrl" class="w-full h-full object-cover" loading="lazy">
             </div>
             <!-- Delete button — top right on hover -->
@@ -1468,7 +1468,7 @@ function app() {
       this.loadAuth();
       if (window.location.search.includes('code=')) await this.handleOAuthCallback();
 
-      const MIGRATION_VERSION = 6;
+      const MIGRATION_VERSION = 7;
       if ((this.settings.migrationVersion || 0) < MIGRATION_VERSION) {
         this.settings.defaultModel = 'gpt_image_2';
         this.settings.defaultAspect = '4:5';
