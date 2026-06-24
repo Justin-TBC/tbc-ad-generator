@@ -312,7 +312,6 @@
             <button class="btn btn-secondary" x-show="generating" @click="stopGenerating()">Stop</button>
           </div>
           <div x-show="!canGenerate() && !generating" class="text-xs text-danger space-y-0.5">
-            <div x-show="generateForm.productIds.length === 0">↑ Select at least one product above</div>
             <div x-show="generateForm.productIds.length > 0 && genType === 'shop' && generateForm.shopTemplateIds.length === 0">↑ Select at least one image type</div>
             <div x-show="generateForm.productIds.length > 0 && settings.imageBackend !== 'google' && !auth.accessToken && !(settings.higgsfieldKeyId && settings.higgsfieldKeySecret)">Not signed in to Higgsfield — go to <button class="underline" @click="view='settings'">Settings</button></div>
             <div x-show="generateForm.productIds.length > 0 && settings.imageBackend === 'google' && !settings.googleApiKey">Google API Key missing — go to <button class="underline" @click="view='settings'">Settings</button></div>
@@ -965,9 +964,17 @@
                 <span class="chip chip-muted text-xs" x-text="item.genType || 'ads'"></span>
                 <span class="text-xs text-muted" x-text="new Date(item.createdAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})"></span>
               </div>
-              <div class="flex gap-2 mt-2">
+              <div class="flex gap-2 mt-2 flex-wrap">
                 <a :href="item.imageUrl" download class="btn btn-secondary text-xs py-1 px-2">Download</a>
+                <button class="btn btn-ghost text-xs py-1 px-2" @click="item.refineOpen = !item.refineOpen">↺ Improve</button>
                 <button class="btn btn-ghost text-xs py-1 px-2" @click="saveHistoryItemAsReference(item)">+ Reference</button>
+              </div>
+              <div x-show="item.refineOpen" class="mt-2 space-y-2">
+                <textarea class="input text-xs" rows="3" x-model="item.refineText" placeholder="What should change?"></textarea>
+                <div class="flex gap-2">
+                  <button class="btn btn-primary text-xs py-1 px-2" :disabled="!item.refineText?.trim() || generating" @click="refineHistoryItem(item)">Send</button>
+                  <button class="btn btn-ghost text-xs py-1 px-2" @click="item.refineOpen = false">Cancel</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1374,7 +1381,6 @@ function app() {
 
     canGenerate() {
       const f = this.generateForm;
-      if (f.productIds.length === 0) return false;
       if (this.genType === 'shop' && f.shopTemplateIds.length === 0) return false;
       if (this.settings.imageBackend === 'google') return !!this.settings.googleApiKey;
       return !!(this.auth.accessToken || (this.settings.higgsfieldKeyId && this.settings.higgsfieldKeySecret));
@@ -2513,6 +2519,27 @@ function app() {
       this.saveReferenceAssets();
     },
 
+    async refineHistoryItem(item) {
+      if (!item.refineText?.trim()) return;
+      // Build a job-like object that refineJob can operate on, then navigate to Ads view
+      const fakeJob = {
+        outputUrl: item.imageUrl,
+        outputBlob: null,
+        label: item.label,
+        aspect: item.aspect || this.generateForm.aspect,
+        requestId: item.serverId || null,
+        refineText: item.refineText,
+        refineOpen: false,
+        status: 'completed',
+        refs: [],
+      };
+      item.refineOpen = false;
+      item.refineText = '';
+      // Switch to Ads view so result appears in current run
+      this.view = this.genType === 'shop' ? 'shop' : 'ads';
+      await this.refineJob(fakeJob);
+    },
+
     async deleteHistoryItem(id) {
       const idx = this.generationHistory.findIndex(h => h.id === id);
       if (idx < 0) return;
@@ -2771,12 +2798,14 @@ function app() {
     buildMirrorPrompt(reference) {
       // Ultra-minimal prompt: copy reference exactly, only swap product
       const kit = this.brandKit;
-      const productCount = this.selectedProducts.map(p => p.images?.[0]?.blob).filter(Boolean).length || 1;
+      const productCount = this.selectedProducts.map(p => p.images?.[0]?.blob).filter(Boolean).length;
       const ordinals = ['FIRST','SECOND','THIRD','FOURTH','FIFTH'];
       const refIdx = productCount; // reference comes right after product(s), no mascot sent
-      const productLine = productCount === 1
-        ? `Image 1 is The Better Cat product — preserve its packaging and label typography exactly.`
-        : `Images 1–${productCount} are The Better Cat products — preserve packaging exactly.`;
+      const productLine = productCount === 0
+        ? '' // no product — brand lifestyle/concept image
+        : productCount === 1
+          ? `Image 1 is The Better Cat product — preserve its packaging and label typography exactly.`
+          : `Images 1–${productCount} are The Better Cat products — preserve packaging exactly.`;
       const angle = this.generateForm.angle ? `\nFocus angle: "${this.generateForm.angle}".` : '';
       return `Recreate image ${refIdx + 1} exactly, but replace the product with The Better Cat product from image 1.
 
@@ -2807,14 +2836,16 @@ All text in image: German, written by a native German copywriter — short, punc
         ? `\n\nBrand context:\n"""\n${kit.description.trim().slice(0,1500)}\n"""\n` : '';
 
       const productBlobs = this.selectedProducts.map(p => p.images?.[0]?.blob).filter(Boolean);
-      const productCount = productBlobs.length || 1;
+      const productCount = productBlobs.length; // may be 0
       const mascotCount = (kit.mascotImages||[]).length;
       const hasMascot = mascotCount > 0;
       const ordinals = ['FIRST','SECOND','THIRD','FOURTH','FIFTH','SIXTH','SEVENTH','EIGHTH'];
 
-      const productLine = productCount === 1
-        ? `The FIRST image is the EXACT PRODUCT — preserve The Better Cat packaging and label typography exactly as shown.`
-        : `The FIRST ${productCount} images are PRODUCT REFERENCES — all must appear correctly. Preserve packaging artwork and label typography precisely.`;
+      const productLine = productCount === 0
+        ? '' // no product images — use brand context and angle only
+        : productCount === 1
+          ? `The FIRST image is the EXACT PRODUCT — preserve The Better Cat packaging and label typography exactly as shown.`
+          : `The FIRST ${productCount} images are PRODUCT REFERENCES — all must appear correctly. Preserve packaging artwork and label typography precisely.`;
 
       const mascotStartIdx = productCount;
       const mascotLine = hasMascot
@@ -2871,7 +2902,7 @@ TEXT: pixel-sharp, high-contrast. COPY: native German, not translated — short,
 
       // No reference — open creative brief
       return `The Better Cat — premium cat food ad, ${this.generateForm.aspect}. Tone: ${tone}.
-
+${productCount === 0 ? 'No product image provided — create a brand lifestyle, concept, or typographic ad without showing a specific product.' : ''}
 ${productLine}${mascotLine}
 ${angleBlock}${productContext}
 
