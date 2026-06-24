@@ -1317,7 +1317,7 @@ function app() {
       shopTemplateIds: [],
       angle: '',
       mode: 'per-ref',
-      aspect: '1:1',
+      aspect: '4:5',
       model: 'gpt_image_2',
       quality: 'high',
       resolution: '4k',
@@ -1438,7 +1438,7 @@ function app() {
       higgsfieldKeySecret: '',
       anthropicKey: '',
       defaultModel: 'gpt_image_2',
-      defaultAspect: '1:1',
+      defaultAspect: '4:5',
       defaultQuality: 'high',
       defaultResolution: '4k',
       modelEndpoints: {
@@ -1471,7 +1471,7 @@ function app() {
       const MIGRATION_VERSION = 6;
       if ((this.settings.migrationVersion || 0) < MIGRATION_VERSION) {
         this.settings.defaultModel = 'gpt_image_2';
-        this.settings.defaultAspect = '1:1';
+        this.settings.defaultAspect = '4:5';
         this.settings.defaultQuality = 'high';
         this.settings.defaultResolution = '4k';
         if (!this.settings.imageBackend) this.settings.imageBackend = 'higgsfield';
