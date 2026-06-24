@@ -385,11 +385,11 @@
                     <div class="flex gap-2 mt-2 flex-wrap" x-show="job.status === 'completed'">
                       <button class="btn btn-secondary text-xs py-1 px-2" @click="downloadJob(job)">Download</button>
                       <button class="btn text-xs py-1 px-2 transition"
-                        :class="job.savedToHistory ? 'btn-secondary text-success' : 'btn-ghost'"
-                        :disabled="job.savedToHistory"
-                        @click="saveJobToHistory(job)">
-                        <span x-show="!job.savedToHistory">☆ Save</span>
-                        <span x-show="job.savedToHistory">✓ Saved</span>
+                        :class="_savedJobKeys[idx] ? 'btn-secondary text-success' : 'btn-ghost'"
+                        :disabled="_savedJobKeys[idx]"
+                        @click="saveJobToHistory(job, idx)">
+                        <span x-show="!_savedJobKeys[idx]">☆ Save</span>
+                        <span x-show="_savedJobKeys[idx]">✓ Saved</span>
                       </button>
                       <button class="btn btn-ghost text-xs py-1 px-2" @click="copyPrompt(job)">Prompt</button>
                       <button class="btn btn-ghost text-xs py-1 px-2" @click="job.refineOpen = !job.refineOpen">↺ Improve</button>
@@ -1273,6 +1273,7 @@ function app() {
     _mediaIdCache: new Map(), // blob → {mediaId, uploadedAt} — avoids re-uploading same image
     refTab: 'competitor',
     generationHistory: [],
+    _savedJobKeys: {},
     notionStatus: 'idle',    // 'idle' | 'ok' | 'error'
     notionLastError: '',
     shopifyStatus: 'idle',   // 'idle' | 'ok' | 'error'
@@ -2545,10 +2546,20 @@ function app() {
       } catch(e) {}
     },
 
-    async saveJobToHistory(job) {
-      await this.saveGenerationToHistory(job, this.genType);
-      job.savedToHistory = true;
-      this.notify('Saved to History.');
+    async saveJobToHistory(job, idx) {
+      // Mark as saving immediately so button gives instant feedback
+      this._savedJobKeys = { ...this._savedJobKeys, [idx]: true };
+      try {
+        await this.saveGenerationToHistory(job, this.genType);
+        this.notify('Saved to History.');
+      } catch(e) {
+        console.error('[save history]', e);
+        this.notify('Save failed: ' + e.message, 'error');
+        // Revert button state on error
+        const keys = { ...this._savedJobKeys };
+        delete keys[idx];
+        this._savedJobKeys = keys;
+      }
     },
 
     async saveGenerationToHistory(job, genType) {
@@ -3130,6 +3141,7 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
       }
 
       this.currentRun = { startedAt: Date.now(), jobs };
+      this._savedJobKeys = {};
 
       try {
         if (this.settings.imageBackend === 'google') {
