@@ -92,7 +92,7 @@
     </nav>
     <div class="text-xs text-muted px-2 pt-4 border-t border-bg-border">
       <div x-text="products.length + ' Products'"></div>
-      <div class="mt-1" x-text="(references.length + ownReferences.length) + ' References'"></div>
+      <div class="mt-1" x-text="(references.length + ownReferences.length + inspirationRefs.length) + ' References'"></div>
     </div>
   </aside>
 
@@ -425,7 +425,26 @@
                 </div>
               </div>
             </template>
-            <div x-show="pickerCompetitorRefs.length === 0 && pickerOwnRefs.length === 0" class="text-sm text-muted py-8 text-center">No references yet. Add some in the References section.</div>
+            <!-- Inspiration refs -->
+            <template x-if="pickerInspirationRefs.length > 0">
+              <div>
+                <div class="text-xs text-muted font-semibold uppercase tracking-wider mb-2 mt-2">— Inspiration —</div>
+                <div class="grid grid-cols-4 gap-3">
+                  <template x-for="ref in pickerInspirationRefs" :key="ref.id">
+                    <div class="card overflow-hidden cursor-pointer ring-2 transition"
+                      :class="generateForm.referenceIds.includes(ref.id) ? 'ring-accent' : 'ring-transparent hover:ring-bg-border'"
+                      @click="toggleRefSelect(ref.id)">
+                      <div class="aspect-square bg-bg-elev relative">
+                        <img :src="refImgSrc(ref)" class="w-full h-full object-cover">
+                        <div x-show="generateForm.referenceIds.includes(ref.id)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent text-bg flex items-center justify-center text-xs font-bold">✓</div>
+                      </div>
+                      <div class="p-2 text-xs text-zinc-100 truncate" x-text="ref.name || 'Unnamed'"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <div x-show="pickerCompetitorRefs.length === 0 && pickerOwnRefs.length === 0 && pickerInspirationRefs.length === 0" class="text-sm text-muted py-8 text-center">No references yet. Add some in the References section.</div>
           </div>
           <div class="px-6 py-4 border-t border-bg-border flex items-center justify-between">
             <div class="text-sm text-muted" x-text="generateForm.referenceIds.length + ' selected'"></div>
@@ -770,6 +789,9 @@
         <button class="px-4 py-1.5 rounded text-sm font-medium transition"
           :class="refTab==='own' ? 'bg-accent text-bg' : 'text-muted hover:text-zinc-100'"
           @click="refTab='own'">Own Ads</button>
+        <button class="px-4 py-1.5 rounded text-sm font-medium transition"
+          :class="refTab==='inspiration' ? 'bg-accent text-bg' : 'text-muted hover:text-zinc-100'"
+          @click="refTab='inspiration'">Inspiration</button>
       </div>
 
       <!-- Meta Ad Library search (Competitors tab only) -->
@@ -857,7 +879,7 @@
       </div>
 
       <div x-show="filteredReferences.length === 0" class="card p-12 text-center">
-        <p class="text-muted" x-text="refTab==='own' ? 'No own ads yet. Add your best-performing TBC creatives.' : 'No competitor references yet. Drag competitor images above.'"></p>
+        <p class="text-muted" x-text="refTab==='own' ? 'No own ads yet. Add your best-performing TBC creatives.' : refTab==='inspiration' ? 'No inspiration images yet. Drag any screenshots, photos or images above.' : 'No competitor references yet. Drag competitor images above.'"></p>
       </div>
 
       <div class="grid grid-cols-4 gap-3">
@@ -884,7 +906,7 @@
       <div class="card w-full max-w-2xl mx-4 my-auto" @click.stop>
         <div class="px-6 py-4 border-b border-bg-border flex items-center justify-between">
           <h2 class="text-lg font-semibold text-zinc-100"
-            x-text="referenceModal.editing ? (referenceModal.source==='own' ? 'Edit Own Ad' : 'Edit Reference') : (referenceModal.source==='own' ? 'New Own Ad' : 'New Reference')"></h2>
+            x-text="referenceModal.editing ? (referenceModal.source==='own' ? 'Edit Own Ad' : referenceModal.source==='inspiration' ? 'Edit Inspiration' : 'Edit Reference') : (referenceModal.source==='own' ? 'New Own Ad' : referenceModal.source==='inspiration' ? 'New Inspiration Image' : 'New Reference')"></h2>
           <button class="btn btn-ghost p-1" @click="closeReferenceModal()">✕</button>
         </div>
         <div class="p-6 space-y-4" x-show="referenceModal.ref">
@@ -1227,6 +1249,7 @@ function app() {
     // ---- State: references, products ----
     references: [],
     ownReferences: [],
+    inspirationRefs: [],
     products: [],
 
     // ---- Single Brand Kit ----
@@ -1358,7 +1381,7 @@ function app() {
     },
 
     referenceById(id) {
-      return [...this.references, ...this.ownReferences].find(r => r.id == id) || null;
+      return [...this.references, ...this.ownReferences, ...this.inspirationRefs].find(r => r.id == id) || null;
     },
 
     toggleProductId(id) {
@@ -1398,12 +1421,12 @@ function app() {
 
     get allTags() {
       const set = new Set();
-      for (const r of [...this.references, ...this.ownReferences]) (r.tags || []).forEach(t => set.add(t));
+      for (const r of [...this.references, ...this.ownReferences, ...this.inspirationRefs]) (r.tags || []).forEach(t => set.add(t));
       return Array.from(set).sort();
     },
 
     get filteredReferences() {
-      const arr = this.refTab === 'own' ? this.ownReferences : this.references;
+      const arr = this.refTab === 'own' ? this.ownReferences : this.refTab === 'inspiration' ? this.inspirationRefs : this.references;
       if (!this.filterTag) return arr;
       return arr.filter(r => (r.tags || []).includes(this.filterTag));
     },
@@ -1416,6 +1439,11 @@ function app() {
     get pickerOwnRefs() {
       if (!this.filterTag) return this.ownReferences;
       return this.ownReferences.filter(r => (r.tags || []).includes(this.filterTag));
+    },
+
+    get pickerInspirationRefs() {
+      if (!this.filterTag) return this.inspirationRefs;
+      return this.inspirationRefs.filter(r => (r.tags || []).includes(this.filterTag));
     },
 
     // ---- Auth ----
@@ -2341,7 +2369,9 @@ function app() {
     },
 
     openReferenceModal(ref = null) {
-      const source = ref ? (this.ownReferences.find(r => r.id === ref?.id) ? 'own' : 'competitor') : this.refTab;
+      const source = ref
+        ? (this.ownReferences.find(r => r.id === ref?.id) ? 'own' : this.inspirationRefs.find(r => r.id === ref?.id) ? 'inspiration' : 'competitor')
+        : this.refTab;
       this.referenceModal = {
         open:true, editing:!!ref, source,
         ref: ref ? { ...this.emptyRef(), ...ref } : this.emptyRef(),
@@ -2364,8 +2394,8 @@ function app() {
     handleBulkRefDrop(event) {
       const files = Array.from(event.dataTransfer.files||[]).filter(f => f.type.startsWith('image/'));
       if (!files.length) return;
-      const arr = this.refTab === 'own' ? this.ownReferences : this.references;
-      const category = this.refTab === 'own' ? 'ref-own' : 'ref-competitor';
+      const arr = this.refTab === 'own' ? this.ownReferences : this.refTab === 'inspiration' ? this.inspirationRefs : this.references;
+      const category = this.refTab === 'own' ? 'ref-own' : this.refTab === 'inspiration' ? 'ref-inspiration' : 'ref-competitor';
       for (const f of files) {
         const entry = { id:this.uid(), name:f.name.replace(/\.[^.]+$/,''), imageBlob:f, tags:[], notes:'', sourceUrl:'', extractedPrinciple:'', imageServerId:null, imageUrl:null };
         arr.push(entry);
@@ -2383,12 +2413,12 @@ function app() {
       if (!ref.id) ref.id = this.uid();
       // Upload image to Volume if not yet persisted
       if (!ref.imageServerId && ref.imageBlob) {
-        const category = this.referenceModal.source === 'own' ? 'ref-own' : 'ref-competitor';
+        const category = this.referenceModal.source === 'own' ? 'ref-own' : this.referenceModal.source === 'inspiration' ? 'ref-inspiration' : 'ref-competitor';
         const file = ref.imageBlob instanceof File ? ref.imageBlob : new File([ref.imageBlob], `${ref.id}.jpg`, { type: ref.imageBlob.type || 'image/jpeg' });
         const serverId = await this.persistAsset(file, category);
         if (serverId) { ref.imageServerId = serverId; ref.imageUrl = `/assets/serve/${serverId}`; }
       }
-      const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.references;
+      const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.referenceModal.source === 'inspiration' ? this.inspirationRefs : this.references;
       if (this.referenceModal.editing) {
         const idx = arr.findIndex(r => r.id === ref.id);
         if (idx >= 0) arr.splice(idx, 1, ref); else arr.push(ref);
@@ -2402,7 +2432,7 @@ function app() {
 
     deleteReference() {
       if (!confirm('Really delete this reference?')) return;
-      const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.references;
+      const arr = this.referenceModal.source === 'own' ? this.ownReferences : this.referenceModal.source === 'inspiration' ? this.inspirationRefs : this.references;
       const ref = this.referenceModal.ref;
       const idx = arr.findIndex(r => r.id === ref.id);
       if (idx >= 0) {
@@ -2446,7 +2476,7 @@ function app() {
         imageServerId: r.imageServerId || null, imageUrl: r.imageUrl || null,
         fromMeta: r.fromMeta || false,
       }));
-      await this.saveMeta('refs', { competitor: serialize(this.references), own: serialize(this.ownReferences) });
+      await this.saveMeta('refs', { competitor: serialize(this.references), own: serialize(this.ownReferences), inspiration: serialize(this.inspirationRefs) });
     },
 
     async loadReferenceAssets() {
@@ -2466,8 +2496,9 @@ function app() {
         await Promise.all([
           restore(data.competitor || [], this.references),
           restore(data.own || [], this.ownReferences),
+          restore(data.inspiration || [], this.inspirationRefs),
         ]);
-        console.log(`[refs] restored ${this.references.length + this.ownReferences.length} references`);
+        console.log(`[refs] restored ${this.references.length + this.ownReferences.length + this.inspirationRefs.length} references`);
       } catch(e) { console.warn('[refs] restore failed:', e.message); }
     },
 
