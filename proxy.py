@@ -41,7 +41,7 @@ SHOPIFY_IS_STOREFRONT = bool(SHOPIFY_TOKEN) and not SHOPIFY_TOKEN.startswith("sh
 META_PREFIX     = "/meta"
 ASSETS_PREFIX   = "/assets"
 ASSETS_DIR      = os.environ.get("ASSETS_DIR", "/data/assets")
-META_BASE       = "https://graph.facebook.com/v21.0"
+META_BASE       = "https://graph.facebook.com/v19.0"
 META_TOKEN      = os.environ.get("META_ACCESS_TOKEN", "")
 
 # Header die unveraendert an Higgsfield weitergegeben werden
