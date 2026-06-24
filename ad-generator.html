@@ -1379,8 +1379,8 @@ function app() {
       shopTemplateIds: [],
       angle: '',
       mode: 'per-ref',
-      aspect: '4:5',      // kept for compat; always mirrors aspects[0]
-      aspects: ['4:5'],   // multi-format selection
+      aspect: '1:1',      // kept for compat; always mirrors aspects[0]
+      aspects: ['1:1'],   // multi-format selection
       model: 'gpt_image_2',
       quality: 'high',
       resolution: '4k',
@@ -1517,7 +1517,7 @@ function app() {
       higgsfieldKeySecret: '',
       anthropicKey: '',
       defaultModel: 'gpt_image_2',
-      defaultAspect: '4:5',
+      defaultAspect: '1:1',
       defaultQuality: 'high',
       defaultResolution: '4k',
       modelEndpoints: {
@@ -1547,10 +1547,10 @@ function app() {
       this.loadAuth();
       if (window.location.search.includes('code=')) await this.handleOAuthCallback();
 
-      const MIGRATION_VERSION = 7;
+      const MIGRATION_VERSION = 8;
       if ((this.settings.migrationVersion || 0) < MIGRATION_VERSION) {
         this.settings.defaultModel = 'gpt_image_2';
-        this.settings.defaultAspect = '4:5';
+        this.settings.defaultAspect = '1:1';
         this.settings.defaultQuality = 'high';
         this.settings.defaultResolution = '4k';
         if (!this.settings.imageBackend) this.settings.imageBackend = 'higgsfield';
@@ -1565,7 +1565,7 @@ function app() {
         localStorage.setItem('adgen.settings', JSON.stringify(this.settings));
       }
       this.generateForm.model   = this.settings.defaultModel;
-      this.generateForm.aspect  = this.settings.defaultAspect  || '4:5';
+      this.generateForm.aspect  = this.settings.defaultAspect  || '1:1';
       this.generateForm.aspects = [this.generateForm.aspect];
       this.generateForm.quality = this.settings.defaultQuality || 'high';
       this.generateForm.resolution = this.settings.defaultResolution || '4k';
