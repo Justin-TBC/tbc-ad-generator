@@ -134,45 +134,81 @@
             </select>
           </div>
 
-          <!-- Product picker (compact dropdown) -->
-          <div x-data="{ open: false }" @click.outside="open = false">
+          <!-- Product picker (compact dropdown with search) -->
+          <div x-data="{ open: false, search: '' }" @click.outside="open = false; search = ''">
             <label class="label">Products</label>
             <div x-show="products.length === 0" class="text-xs text-danger">
               No products yet. <button class="underline" @click="view='products'">Add products</button>
             </div>
             <div x-show="products.length > 0">
-              <!-- Trigger button -->
-              <button type="button" class="input text-left flex items-center justify-between cursor-pointer"
-                @click="open = !open">
-                <span class="text-sm" :class="generateForm.productIds.length ? 'text-zinc-100' : 'text-muted'"
-                  x-text="generateForm.productIds.length ? generateForm.productIds.length + ' product' + (generateForm.productIds.length > 1 ? 's' : '') + ' selected' : 'Select products…'">
-                </span>
+              <!-- Trigger / search input -->
+              <div class="input flex items-center gap-2 cursor-text" @click="open = true; $nextTick(() => $refs.prodSearch.focus())">
+                <template x-if="!open">
+                  <span class="text-sm flex-1 truncate" :class="generateForm.productIds.length ? 'text-zinc-100' : 'text-muted'"
+                    x-text="generateForm.productIds.length ? generateForm.productIds.length + ' product' + (generateForm.productIds.length > 1 ? 's' : '') + ' selected' : 'Select products…'">
+                  </span>
+                </template>
+                <template x-if="open">
+                  <input x-ref="prodSearch" type="text" x-model="search"
+                    class="bg-transparent outline-none flex-1 text-sm text-zinc-100 placeholder-muted"
+                    placeholder="Search products…"
+                    @keydown.escape="open = false; search = ''"
+                    @click.stop>
+                </template>
                 <svg class="w-4 h-4 text-muted flex-shrink-0 transition" :class="open ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
+              </div>
               <!-- Dropdown panel -->
               <div x-show="open" x-transition.opacity class="mt-1 card overflow-hidden max-h-72 overflow-y-auto z-10 relative">
-                <!-- Group by collection -->
-                <template x-for="col in ['Nassfutter','Trockenfutter','Snacks','Futterzusatz','Merch','Other']" :key="col">
-                  <template x-if="products.filter(p => p.category === col).length > 0">
-                    <div>
-                      <div class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted bg-bg-elev border-b border-bg-border" x-text="col"></div>
-                      <template x-for="prod in products.filter(p => p.category === col)" :key="prod.id">
-                        <div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-elev transition border-b border-bg-border last:border-0"
-                          :class="generateForm.productIds.includes(prod.id) ? 'bg-accent/5' : ''"
-                          @click.stop="toggleProductId(prod.id)">
-                          <div class="w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition"
-                            :class="generateForm.productIds.includes(prod.id) ? 'bg-accent border-accent' : 'border-bg-border'">
-                            <svg x-show="generateForm.productIds.includes(prod.id)" class="w-3 h-3 text-bg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                          </div>
-                          <template x-if="prod.images && prod.images.length">
-                            <img :src="imgSrc(prod.images[0])" class="w-7 h-7 rounded object-cover bg-bg-elev flex-shrink-0">
+                <template x-if="search.trim()">
+                  <!-- Search results: flat list, no grouping -->
+                  <div>
+                    <template x-for="prod in products.filter(p => p.title.toLowerCase().includes(search.toLowerCase()) || (p.category||'').toLowerCase().includes(search.toLowerCase()) || (p.flavor||'').toLowerCase().includes(search.toLowerCase()))" :key="prod.id">
+                      <div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-elev transition border-b border-bg-border last:border-0"
+                        :class="generateForm.productIds.includes(prod.id) ? 'bg-accent/5' : ''"
+                        @click.stop="toggleProductId(prod.id)">
+                        <div class="w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition"
+                          :class="generateForm.productIds.includes(prod.id) ? 'bg-accent border-accent' : 'border-bg-border'">
+                          <svg x-show="generateForm.productIds.includes(prod.id)" class="w-3 h-3 text-bg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <template x-if="prod.images && prod.images.length">
+                          <img :src="imgSrc(prod.images[0])" class="w-7 h-7 rounded object-cover bg-bg-elev flex-shrink-0">
+                        </template>
+                        <div class="min-w-0 flex-1">
+                          <span class="text-sm text-zinc-100 truncate block" x-text="prod.title"></span>
+                          <span class="text-xs text-muted" x-text="prod.category + (prod.flavor ? ' · ' + prod.flavor : '')"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <div x-show="products.filter(p => p.title.toLowerCase().includes(search.toLowerCase()) || (p.category||'').toLowerCase().includes(search.toLowerCase()) || (p.flavor||'').toLowerCase().includes(search.toLowerCase())).length === 0"
+                      class="px-3 py-4 text-sm text-muted text-center">No products match "<span x-text="search"></span>"</div>
+                  </div>
+                </template>
+                <template x-if="!search.trim()">
+                  <!-- Default: grouped by collection -->
+                  <div>
+                    <template x-for="col in ['Nassfutter','Trockenfutter','Snacks','Futterzusatz','Merch','Other']" :key="col">
+                      <template x-if="products.filter(p => p.category === col).length > 0">
+                        <div>
+                          <div class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted bg-bg-elev border-b border-bg-border" x-text="col"></div>
+                          <template x-for="prod in products.filter(p => p.category === col)" :key="prod.id">
+                            <div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-elev transition border-b border-bg-border last:border-0"
+                              :class="generateForm.productIds.includes(prod.id) ? 'bg-accent/5' : ''"
+                              @click.stop="toggleProductId(prod.id)">
+                              <div class="w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition"
+                                :class="generateForm.productIds.includes(prod.id) ? 'bg-accent border-accent' : 'border-bg-border'">
+                                <svg x-show="generateForm.productIds.includes(prod.id)" class="w-3 h-3 text-bg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                              </div>
+                              <template x-if="prod.images && prod.images.length">
+                                <img :src="imgSrc(prod.images[0])" class="w-7 h-7 rounded object-cover bg-bg-elev flex-shrink-0">
+                              </template>
+                              <span class="text-sm text-zinc-100 truncate flex-1" x-text="prod.title"></span>
+                              <span x-show="prod.flavor" class="text-xs text-muted flex-shrink-0" x-text="prod.flavor"></span>
+                            </div>
                           </template>
-                          <span class="text-sm text-zinc-100 truncate flex-1" x-text="prod.title"></span>
-                          <span x-show="prod.flavor" class="text-xs text-muted flex-shrink-0" x-text="prod.flavor"></span>
                         </div>
                       </template>
-                    </div>
-                  </template>
+                    </template>
+                  </div>
                 </template>
               </div>
               <!-- Selected chips -->
