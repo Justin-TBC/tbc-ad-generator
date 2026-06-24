@@ -283,14 +283,16 @@
 
           <!-- Format / Model / Quality / Resolution -->
           <div class="grid grid-cols-2 gap-3">
-            <div x-show="genType === 'ads'">
-              <label class="label">Format</label>
-              <select class="input" x-model="generateForm.aspect">
-                <option value="1:1">1:1 Meta Feed</option>
-                <option value="4:5">4:5 Portrait</option>
-                <option value="9:16">9:16 Story</option>
-                <option value="16:9">16:9 Landscape</option>
-              </select>
+            <div x-show="genType === 'ads'" class="col-span-2">
+              <label class="label">Format <span class="text-zinc-600 normal-case tracking-normal font-normal">(select one or more)</span></label>
+              <div class="flex flex-wrap gap-1.5">
+                <template x-for="fmt in [['1:1','1:1'],['4:5','4:5'],['9:16','9:16'],['16:9','16:9']]" :key="fmt[0]">
+                  <button type="button" class="chip cursor-pointer transition"
+                    :class="generateForm.aspects.includes(fmt[0]) ? 'chip-accent' : 'chip-muted'"
+                    @click="toggleAspect(fmt[0])"
+                    x-text="fmt[1]"></button>
+                </template>
+              </div>
             </div>
             <div x-show="settings.imageBackend !== 'google'">
               <label class="label">Model</label>
@@ -1377,7 +1379,8 @@ function app() {
       shopTemplateIds: [],
       angle: '',
       mode: 'per-ref',
-      aspect: '4:5',
+      aspect: '4:5',      // kept for compat; always mirrors aspects[0]
+      aspects: ['4:5'],   // multi-format selection
       model: 'gpt_image_2',
       quality: 'high',
       resolution: '4k',
@@ -1433,6 +1436,16 @@ function app() {
       else this.generateForm.referenceIds.push(id);
     },
 
+    toggleAspect(fmt) {
+      const i = this.generateForm.aspects.indexOf(fmt);
+      if (i >= 0) {
+        if (this.generateForm.aspects.length > 1) this.generateForm.aspects.splice(i, 1);
+      } else {
+        this.generateForm.aspects.push(fmt);
+      }
+      this.generateForm.aspect = this.generateForm.aspects[0]; // keep compat
+    },
+
     toggleShopTemplate(id) {
       const i = this.generateForm.shopTemplateIds.indexOf(id);
       if (i >= 0) this.generateForm.shopTemplateIds.splice(i, 1);
@@ -1448,12 +1461,13 @@ function app() {
 
     plannedCount() {
       const f = this.generateForm;
+      const fmts = f.aspects?.length || 1;
       if (this.genType === 'shop') {
         if (f.shopTemplateIds.length > 1) return f.shopTemplateIds.length;
-        return f.count || 1;
+        return (f.count || 1) * fmts;
       }
-      if (f.referenceIds.length > 1 && f.mode === 'per-ref') return f.referenceIds.length;
-      return f.count || 1;
+      const base = (f.referenceIds.length > 1 && f.mode === 'per-ref') ? f.referenceIds.length : (f.count || 1);
+      return base * fmts;
     },
 
     get allTags() {
@@ -1551,7 +1565,8 @@ function app() {
         localStorage.setItem('adgen.settings', JSON.stringify(this.settings));
       }
       this.generateForm.model   = this.settings.defaultModel;
-      this.generateForm.aspect  = this.settings.defaultAspect  || '1:1';
+      this.generateForm.aspect  = this.settings.defaultAspect  || '4:5';
+      this.generateForm.aspects = [this.generateForm.aspect];
       this.generateForm.quality = this.settings.defaultQuality || 'high';
       this.generateForm.resolution = this.settings.defaultResolution || '4k';
 
@@ -2951,7 +2966,7 @@ HEADLINE FONT: any headline or large display text must use a bold geometric sans
       if (reference) {
         // Reference defines format/type/composition. Brand identity applied on top.
         // Image order: reference FIRST so model anchors on it, then product. No mascot — it biases toward graphic style.
-        return `Create a The Better Cat ad (${this.generateForm.aspect}).
+        return `Create a The Better Cat ad (${this._currentJobAspect || this.generateForm.aspects?.[0] || this.generateForm.aspect}).
 
 Image 1 is the FORMAT REFERENCE — it defines the type, composition and concept of this ad.
 Image${productCount > 1 ? 's 2–' + (productCount + 1) : ' 2'} ${productCount > 1 ? 'are' : 'is'} The Better Cat product — preserve packaging and label typography exactly.
@@ -2979,7 +2994,7 @@ TEXT: pixel-sharp, high-contrast. COPY: native German, not translated — short,
       }
 
       // No reference — open creative brief
-      return `The Better Cat — premium cat food ad, ${this.generateForm.aspect}. Tone: ${tone}.
+      return `The Better Cat — premium cat food ad, ${this._currentJobAspect || this.generateForm.aspects?.[0] || this.generateForm.aspect}. Tone: ${tone}.
 ${productCount === 0 ? 'No product image provided — create a brand lifestyle, concept, or typographic ad without showing a specific product.' : ''}
 ${productLine}${mascotLine}
 ${angleBlock}${productContext}
@@ -3140,6 +3155,20 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
         for (let i = 0; i < cnt; i++) jobs.push({ label:`Consolidated ${i+1}`, refs, status:'pending' });
       }
 
+      // Expand jobs by selected formats (for ads only; shop uses per-template aspect)
+      const selectedAspects = (this.genType === 'ads' && f.aspects?.length) ? f.aspects : null;
+      if (selectedAspects && selectedAspects.length > 1) {
+        const expanded = [];
+        for (const baseJob of jobs) {
+          for (const asp of selectedAspects) {
+            expanded.push({ ...baseJob, label: `${baseJob.label} · ${asp}`, _aspect: asp });
+          }
+        }
+        jobs = expanded;
+      } else if (selectedAspects) {
+        jobs = jobs.map(j => ({ ...j, _aspect: selectedAspects[0] }));
+      }
+
       this.currentRun = { startedAt: Date.now(), jobs };
       this._savedJobKeys = {};
 
@@ -3151,13 +3180,14 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
             try {
               job.status = 'in_progress';
               const refForJob = job.refs[0] || null;
+              this._currentJobAspect = job._aspect || f.aspect;
               const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
               const extras = f.customPrompt?.trim();
               const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS ===\n${extras}` : basePrompt;
               job.prompt = prompt;
 
               const tplObj = job.template ? this.shopTemplates.find(t => t.id===job.template) : null;
-              job.aspect = tplObj?.aspect || f.aspect;
+              job.aspect = tplObj?.aspect || job._aspect || f.aspect;
 
               // Ref present: reference first → product (no mascot). No ref: product → mascot.
               const imageBlobs = f.sendImages
@@ -3203,6 +3233,7 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
             try {
               job.status = 'queued';
               const refForJob = job.refs[0] || null;
+              this._currentJobAspect = job._aspect || f.aspect;
               const basePrompt = job.template ? this.buildShopPrompt(job.template, job.refs) : this.buildPrompt(refForJob);
               const extras = f.customPrompt?.trim();
               const prompt = extras ? `${basePrompt}\n\n=== ADDITIONAL USER INSTRUCTIONS (high priority) ===\n${extras}` : basePrompt;
@@ -3219,7 +3250,7 @@ ${scene.text} All text in image: GERMAN. Rebellious, confident, premium cat food
               }
 
               const tplObj = job.template ? this.shopTemplates.find(t=>t.id===job.template) : null;
-              const jobAspect = tplObj?.aspect || f.aspect;
+              const jobAspect = tplObj?.aspect || job._aspect || f.aspect;
               job.aspect = jobAspect;
               job.requestBody = { prompt, aspect_ratio:jobAspect, mediaIds:jobMediaIds, count:1 };
               job.endpoint = this.settings.modelEndpoints?.[f.model] || f.model;
