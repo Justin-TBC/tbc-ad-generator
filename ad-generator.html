@@ -857,36 +857,31 @@
         <div x-show="metaSearch.error" class="text-xs text-danger mb-3" x-text="metaSearch.error"></div>
         <!-- Results -->
         <div x-show="metaSearch.results.length > 0">
-          <div class="text-xs text-muted mb-3" x-text="metaSearch.results.length + ' ads found — click to save as reference'"></div>
+          <div class="text-xs text-muted mb-3" x-text="metaSearch.results.length + ' image ads found'"></div>
           <div class="grid grid-cols-4 gap-3">
             <template x-for="(ad, idx) in metaSearch.results" :key="ad.id">
-              <div class="card overflow-hidden group relative">
-                <!-- Image or placeholder -->
+              <div class="card overflow-hidden">
+                <!-- Ad image -->
                 <div class="aspect-square bg-bg-elev relative overflow-hidden">
-                  <template x-if="ad.imageUrl">
-                    <img :src="ad.imageUrl" class="w-full h-full object-cover">
-                  </template>
-                  <template x-if="!ad.imageUrl">
-                    <div class="w-full h-full flex flex-col items-center justify-center text-muted gap-1 p-2 text-center">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                      <span class="text-xs leading-tight" x-text="ad.body ? ad.body.slice(0,60) : 'No image'"></span>
-                    </div>
-                  </template>
-                  <!-- Overlay: save button -->
-                  <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                    <button class="btn btn-primary text-xs py-1 px-3" @click.stop="saveMetaAdAsReference(ad, idx)">
-                      <span x-show="!ad.saving">+ Save</span>
-                      <span x-show="ad.saving">Saving…</span>
-                      <span x-show="ad.saved" class="text-success">✓ Saved</span>
-                    </button>
-                  </div>
-                  <!-- Saved badge -->
-                  <div x-show="ad.saved" class="absolute top-1 right-1 chip chip-success text-xs">✓</div>
+                  <img :src="ad.imageUrl" class="w-full h-full object-cover"
+                    @error="$el.style.display='none'">
+                  <div x-show="ad.saved" class="absolute top-1 right-1 chip chip-success text-xs">✓ Saved</div>
                 </div>
+                <!-- Footer -->
                 <div class="p-2">
-                  <div class="text-xs font-medium text-zinc-100 truncate" x-text="ad.pageName"></div>
-                  <div class="text-xs text-muted truncate mt-0.5" x-text="ad.title || ad.body?.slice(0,50) || '—'"></div>
-                  <a :href="ad.snapshotUrl" target="_blank" class="text-xs text-accent hover:underline mt-0.5 inline-block">View ad ↗</a>
+                  <div class="text-xs font-semibold text-zinc-100 truncate mb-1" x-text="ad.pageName"></div>
+                  <div class="text-xs text-muted truncate" x-text="ad.title || ad.body?.slice(0,50) || '—'"></div>
+                  <div class="flex items-center gap-2 mt-2">
+                    <button class="btn text-xs py-1 px-2 flex-1 justify-center"
+                      :class="ad.saved ? 'btn-secondary text-success' : 'btn-primary'"
+                      :disabled="ad.saving || ad.saved"
+                      @click="saveMetaAdAsReference(ad, idx)">
+                      <span x-show="!ad.saving && !ad.saved">☆ Save</span>
+                      <span x-show="ad.saving">Saving…</span>
+                      <span x-show="ad.saved">✓ Saved</span>
+                    </button>
+                    <a :href="ad.snapshotUrl" target="_blank" class="btn btn-secondary text-xs py-1 px-2">View ↗</a>
+                  </div>
                 </div>
               </div>
             </template>
@@ -1877,8 +1872,9 @@ function app() {
         search_terms: q,
         ad_reached_countries: JSON.stringify([this.metaSearch.country]),
         ad_type: 'ALL',
+        media_type: 'IMAGE',   // static/image ads only, no videos
         fields,
-        limit: '24',
+        limit: '48',           // fetch more since we filter out non-image ads
       });
       if (loadMore && this.metaSearch.nextCursor) {
         params.set('after', this.metaSearch.nextCursor);
@@ -1892,13 +1888,15 @@ function app() {
         }
         const data = await res.json();
 
-        const mapped = (data.data || []).map(ad => {
-          // Extract best available image URL
-          let imageUrl = null;
+        const mapped = (data.data || []).flatMap(ad => {
           const imgs = ad.ad_creative_images || [];
-          if (imgs.length) imageUrl = imgs[0].original_image_url || imgs[0].url || null;
+          if (!imgs.length) return []; // skip ads with no images
+          // Route image through proxy to bypass Facebook CDN CORS
+          const rawUrl = imgs[0].original_image_url || imgs[0].url || null;
+          const imageUrl = rawUrl ? `/img-proxy?url=${encodeURIComponent(rawUrl)}` : null;
+          if (!imageUrl) return [];
 
-          return {
+          return [{
             id: ad.id,
             pageName: ad.page_name || 'Unknown page',
             body: (ad.ad_creative_bodies || [])[0] || '',
@@ -1907,9 +1905,10 @@ function app() {
             snapshotUrl: ad.ad_snapshot_url || '',
             startDate: ad.ad_delivery_start_time || '',
             imageUrl,
+            rawImageUrl: rawUrl,
             saving: false,
             saved: false,
-          };
+          }];
         });
 
         this.metaSearch.results = loadMore ? [...this.metaSearch.results, ...mapped] : mapped;
@@ -1931,7 +1930,7 @@ function app() {
 
       let imageBlob = null;
 
-      // Try fetching the image as a blob
+      // Fetch through proxy (ad.imageUrl is already /img-proxy?url=... so no CORS issue)
       if (ad.imageUrl) {
         try {
           const res = await fetch(ad.imageUrl);

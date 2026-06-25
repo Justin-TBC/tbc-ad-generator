@@ -7,7 +7,10 @@
       "Bash(git remote *)",
       "Bash(git push *)",
       "Bash(curl -s https://tbc-ad-generator-production.up.railway.app/assets/list)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"https://tbc-ad-generator-production.up.railway.app/meta/ads_archive?search_terms=Zooplus&ad_reached_countries=%5B%22DE%22%5D&ad_type=ALL&fields=id,page_name,ad_snapshot_url&limit=3\")",
+      "Bash(curl -s \"https://tbc-ad-generator-production.up.railway.app/meta/me?fields=id,name\")",
+      "WebFetch(domain:developers.facebook.com)"
     ]
   }
 }
