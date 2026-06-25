@@ -1872,9 +1872,8 @@ function app() {
         search_terms: q,
         ad_reached_countries: JSON.stringify([this.metaSearch.country]),
         ad_type: 'ALL',
-        media_type: 'IMAGE',   // static/image ads only, no videos
         fields,
-        limit: '48',           // fetch more since we filter out non-image ads
+        limit: '48',
       });
       if (loadMore && this.metaSearch.nextCursor) {
         params.set('after', this.metaSearch.nextCursor);
