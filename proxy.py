@@ -116,6 +116,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _is_img_proxy(self):
         return self.path.startswith("/img-proxy")
 
+    def _is_snap_img(self):
+        return self.path.startswith("/meta-snap")
+
     def _is_assets(self):
         return self.path.startswith(ASSETS_PREFIX + "/") or self.path == ASSETS_PREFIX
 
@@ -127,6 +130,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif self._is_meta():        self._meta_proxy()
         elif self._is_assets():      self._assets_handler()
         elif self._is_img_proxy():   self._img_proxy_handler()
+        elif self._is_snap_img():    self._snap_img_handler()
         else:                        super().do_GET()
 
     def do_POST(self):
@@ -550,6 +554,47 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
             return
 
         self.send_error(404)
+
+    # --- Meta ad snapshot image extractor ---
+    def _snap_img_handler(self):
+        import re as _re
+        qs = parse_qs(urlparse(self.path).query)
+        ad_id = qs.get('id', [None])[0]
+        if not ad_id or not META_TOKEN:
+            self.send_error(400); return
+        snapshot_url = f"https://www.facebook.com/ads/archive/render_ad/?id={ad_id}&access_token={META_TOKEN}"
+        try:
+            req = urllib.request.Request(snapshot_url)
+            req.add_header('User-Agent', FALLBACK_USER_AGENT)
+            req.add_header('Accept', 'text/html')
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                html = resp.read().decode('utf-8', errors='ignore')
+            # Try og:image first
+            m = _re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html)
+            if not m:
+                m = _re.search(r'content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html)
+            # Fall back to first large <img> src
+            if not m:
+                m = _re.search(r'<img[^>]+src=["\']([^"\']+fbcdn[^"\']+)["\']', html)
+            if not m:
+                self.send_error(404); return
+            img_url = m.group(1).replace('&amp;', '&')
+            img_req = urllib.request.Request(img_url)
+            img_req.add_header('User-Agent', FALLBACK_USER_AGENT)
+            img_req.add_header('Referer', 'https://www.facebook.com/')
+            with urllib.request.urlopen(img_req, timeout=15) as img_resp:
+                data = img_resp.read()
+                ct = img_resp.getheader('Content-Type', 'image/jpeg')
+            self.send_response(200)
+            self._add_cors()
+            self.send_header('Content-Type', ct)
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'public, max-age=3600')
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as e:
+            sys.stderr.write(f"[snap-img] {ad_id}: {e}\n")
+            self.send_error(502)
 
     # --- Image proxy (bypasses CORS for Facebook CDN images) ---
     def _img_proxy_handler(self):

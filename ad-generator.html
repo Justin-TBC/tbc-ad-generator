@@ -1887,28 +1887,19 @@ function app() {
         }
         const data = await res.json();
 
-        const mapped = (data.data || []).flatMap(ad => {
-          const imgs = ad.ad_creative_images || [];
-          if (!imgs.length) return []; // skip ads with no images
-          // Route image through proxy to bypass Facebook CDN CORS
-          const rawUrl = imgs[0].original_image_url || imgs[0].url || null;
-          const imageUrl = rawUrl ? `/img-proxy?url=${encodeURIComponent(rawUrl)}` : null;
-          if (!imageUrl) return [];
-
-          return [{
-            id: ad.id,
-            pageName: ad.page_name || 'Unknown page',
-            body: (ad.ad_creative_bodies || [])[0] || '',
-            title: (ad.ad_creative_link_titles || [])[0] || '',
-            caption: (ad.ad_creative_link_captions || [])[0] || '',
-            snapshotUrl: ad.ad_snapshot_url || '',
-            startDate: ad.ad_delivery_start_time || '',
-            imageUrl,
-            rawImageUrl: rawUrl,
-            saving: false,
-            saved: false,
-          }];
-        });
+        const mapped = (data.data || []).map(ad => ({
+          id: ad.id,
+          pageName: ad.page_name || 'Unknown page',
+          body: (ad.ad_creative_bodies || [])[0] || '',
+          title: (ad.ad_creative_link_titles || [])[0] || '',
+          caption: (ad.ad_creative_link_captions || [])[0] || '',
+          snapshotUrl: ad.ad_snapshot_url || '',
+          startDate: ad.ad_delivery_start_time || '',
+          // Fetch actual ad image from snapshot page via server-side proxy
+          imageUrl: `/meta-snap?id=${ad.id}`,
+          saving: false,
+          saved: false,
+        }));
 
         this.metaSearch.results = loadMore ? [...this.metaSearch.results, ...mapped] : mapped;
         this.metaSearch.hasMore = !!data.paging?.cursors?.after && (data.data||[]).length === 24;
