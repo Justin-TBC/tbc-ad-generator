@@ -857,41 +857,25 @@
         <div x-show="metaSearch.error" class="text-xs text-danger mb-3" x-text="metaSearch.error"></div>
         <!-- Results -->
         <div x-show="metaSearch.results.length > 0">
-          <!-- Counter -->
           <div class="text-xs text-muted mb-3">
-            <span x-text="metaSearch.results.filter(a => !a.isVideo && a.creativeImageUrl).length + ' Bild-Ads gefunden'"></span>
-            <span x-show="metaSearch.results.filter(a => a.isVideo).length > 0" class="ml-2 text-zinc-600"
-              x-text="'(' + metaSearch.results.filter(a => a.isVideo).length + ' Videos ausgeblendet)'"></span>
-            <span x-show="metaSearch.results.filter(a => a.snapshotLoading).length > 0" class="ml-2"
-              x-text="'· loading ' + metaSearch.results.filter(a => a.snapshotLoading).length + '…'"></span>
+            <span x-text="metaSearch.results.filter(a => !a._isVideo).length + ' ads found'"></span>
+            <span x-show="metaSearch.results.filter(a => a._isVideo).length > 0" class="ml-2 text-zinc-600"
+              x-text="'(' + metaSearch.results.filter(a => a._isVideo).length + ' videos hidden)'"></span>
           </div>
           <div class="grid grid-cols-4 gap-3">
-            <template x-for="(ad, idx) in metaSearch.results.filter(a => !a.isVideo)" :key="ad.id">
+            <template x-for="(ad, idx) in metaSearch.results.filter(a => !a._isVideo)" :key="ad.id">
               <div class="card overflow-hidden">
-                <!-- Creative image or loading state -->
                 <div class="aspect-square bg-bg-elev relative overflow-hidden">
-                  <template x-if="ad.creativeImageUrl">
-                    <img :src="ad.creativeImageUrl" class="w-full h-full object-cover" loading="lazy">
-                  </template>
-                  <template x-if="!ad.creativeImageUrl">
-                    <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted p-2 text-center">
-                      <template x-if="ad.snapshotLoading">
-                        <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
-                      </template>
-                      <template x-if="!ad.snapshotLoading">
-                        <span class="text-xs" x-text="ad.snapshotError || 'No image'"></span>
-                      </template>
-                    </div>
-                  </template>
+                  <img :src="ad.imageUrl" class="w-full h-full object-cover" loading="lazy"
+                    @error="fetch(ad.imageUrl, {method:'HEAD'}).then(r => { if(r.status === 204) ad._isVideo = true })">
                   <div x-show="ad.saved" class="absolute top-1 right-1 chip chip-success text-xs">✓ Saved</div>
                 </div>
-                <!-- Footer -->
                 <div class="p-2">
-                  <div class="text-xs font-medium text-zinc-100 truncate" x-text="ad.advertiser || ad.pageName"></div>
+                  <div class="text-xs font-medium text-zinc-100 truncate" x-text="ad.pageName"></div>
                   <div class="flex items-center gap-2 mt-1.5">
                     <button class="btn text-xs py-1 px-2 flex-1 justify-center"
                       :class="ad.saved ? 'btn-secondary text-success' : 'btn-primary'"
-                      :disabled="ad.saving || ad.saved || !ad.creativeImageUrl"
+                      :disabled="ad.saving || ad.saved"
                       @click="saveMetaAdAsReference(ad, idx)">
                       <span x-show="!ad.saving && !ad.saved">☆ Save</span>
                       <span x-show="ad.saving">Saving…</span>
@@ -1912,13 +1896,9 @@ function app() {
           caption: (ad.ad_creative_link_captions || [])[0] || '',
           snapshotUrl: ad.ad_snapshot_url || '',
           startDate: ad.ad_delivery_start_time || '',
-          // Snapshot-loaded fields (populated async by loadAdSnapshots)
-          creativeImageUrl: null,
-          advertiser: ad.page_name || '',
-          adText: '',
-          isVideo: false,
-          snapshotLoading: true,
-          snapshotError: null,
+          // /meta-snap?id=... returns image bytes (200) or 204 for video ads
+          imageUrl: `/meta-snap?id=${ad.id}`,
+          _isVideo: false,
           saving: false,
           saved: false,
         }));
@@ -1927,8 +1907,6 @@ function app() {
         this.metaSearch.hasMore = !!data.paging?.cursors?.after && (data.data||[]).length === 24;
         this.metaSearch.nextCursor = data.paging?.cursors?.after || null;
         this.metaSearch.error = '';
-        // Load snapshots in background (batches of 3 to avoid overloading Playwright)
-        this.loadAdSnapshots(mapped);
       } catch(e) {
         this.metaSearch.error = e.message.includes('META_ACCESS_TOKEN')
           ? 'META_ACCESS_TOKEN not set — add it in Railway environment variables.'
@@ -1967,41 +1945,39 @@ function app() {
     },
 
     async saveMetaAdAsReference(ad, idx) {
-      if (ad.saved || ad.saving || !ad.creativeImageUrl) return;
+      if (ad.saved || ad.saving) return;
       ad.saving = true;
 
+      // Fetch the ad image via /meta-snap (Playwright-rendered, cached on Volume)
       let imageBlob = null;
       try {
-        // creativeImageUrl = /meta-image?url=... — already routed through our proxy
-        const res = await fetch(ad.creativeImageUrl);
+        const res = await fetch(ad.imageUrl);
         if (res.ok) imageBlob = await res.blob();
-      } catch(e) {
-        console.warn('[meta-save] image fetch failed:', e.message);
+      } catch(e) { console.warn('[meta-save]', e.message); }
+
+      if (!imageBlob || imageBlob.size < 100) {
+        ad.saving = false;
+        this.notify('Image not ready yet — wait a few seconds and try again', 'error');
+        return;
       }
 
-      if (!imageBlob) { ad.saving = false; this.notify('Could not fetch ad image', 'error'); return; }
-
-      // Persist image to Volume (same as other references)
-      let imageServerId = null;
-      let imageUrl = null;
+      // Persist to Volume so it survives refresh (same pattern as other references)
+      let imageServerId = null, imageUrl = null;
       try {
         const file = new File([imageBlob], `meta_${ad.id}.jpg`, { type: imageBlob.type || 'image/jpeg' });
         imageServerId = await this.persistAsset(file, 'ref-competitor');
         if (imageServerId) imageUrl = `/assets/serve/${imageServerId}`;
       } catch(e) {}
 
-      const advertiser = ad.advertiser || ad.pageName;
-      const adText = ad.adText || ad.body || ad.title || '';
-
-      // Exact same shape as a manually uploaded competitor reference
+      const name = `${ad.pageName} — ${(ad.title || ad.body || '').slice(0, 40) || 'Meta Ad'}`;
       const ref = {
         id: this.uid(),
-        name: `${advertiser} — ${adText.slice(0, 40) || 'Meta Ad'}`,
+        name,
         imageBlob,
         imageServerId,
         imageUrl,
-        tags: ['meta', 'competitor', advertiser.toLowerCase().replace(/\s+/g, '-'), this.metaSearch.country.toLowerCase()],
-        notes: adText,
+        tags: ['meta', 'competitor', this.metaSearch.country.toLowerCase()],
+        notes: [ad.body, ad.caption].filter(Boolean).join('\n'),
         sourceUrl: ad.snapshotUrl,
         extractedPrinciple: '',
         fromMeta: true,

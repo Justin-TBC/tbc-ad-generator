@@ -572,7 +572,7 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
             self.send_error(400); return
 
         os.makedirs(ASSETS_DIR, exist_ok=True)
-        cache_path = os.path.join(ASSETS_DIR, f'meta_snap_{ad_id}.jpg')
+        cache_path = os.path.join(ASSETS_DIR, f'meta_snap2_{ad_id}.jpg')  # v2: clean creative
 
         # Serve from cache if available
         if os.path.exists(cache_path):
