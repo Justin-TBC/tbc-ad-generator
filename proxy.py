@@ -130,17 +130,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return self.path.startswith(ASSETS_PREFIX + "/") or self.path == ASSETS_PREFIX
 
     def do_GET(self):
-        if self._is_api():           self._proxy()
-        elif self._is_notion():      self._notion_proxy()
-        elif self._is_shopify_auth():self._shopify_auth()
-        elif self._is_shopify():     self._shopify_proxy()
-        elif self._is_meta():        self._meta_proxy()
-        elif self._is_assets():      self._assets_handler()
+        if self._is_api():              self._proxy()
+        elif self._is_notion():         self._notion_proxy()
+        elif self._is_shopify_auth():   self._shopify_auth()
+        elif self._is_shopify():        self._shopify_proxy()
+        elif self._is_meta_snapshot():  self._meta_snapshot_handler()  # before /meta
+        elif self._is_meta_image():     self._meta_image_handler()     # before /meta
+        elif self._is_meta():           self._meta_proxy()
+        elif self._is_assets():         self._assets_handler()
         elif self._is_img_proxy():      self._img_proxy_handler()
         elif self._is_snap_img():       self._snap_img_handler()
-        elif self._is_meta_snapshot():  self._meta_snapshot_handler()
-        elif self._is_meta_image():     self._meta_image_handler()
-        else:                        super().do_GET()
+        else:                           super().do_GET()
 
     def do_POST(self):
         if self._is_api():           self._proxy()
