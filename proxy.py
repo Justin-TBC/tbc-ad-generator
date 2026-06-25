@@ -581,36 +581,83 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
         try:
             from playwright.sync_api import sync_playwright
             snapshot_url = f"https://www.facebook.com/ads/archive/render_ad/?id={ad_id}&access_token={META_TOKEN}"
+            img_data = None
+            is_video = False
+
             with sync_playwright() as pw:
                 browser = pw.chromium.launch(
                     headless=True,
                     args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
                 )
                 ctx = browser.new_context(
-                    viewport={'width': 600, 'height': 600},
+                    viewport={'width': 800, 'height': 800},
                     user_agent=FALLBACK_USER_AGENT
                 )
                 page = ctx.new_page()
                 page.goto(snapshot_url, wait_until='domcontentloaded', timeout=30000)
-                page.wait_for_timeout(3000)
-                screenshot = page.screenshot(
-                    type='jpeg', quality=85,
-                    clip={'x': 0, 'y': 0, 'width': 600, 'height': 600}
-                )
+                page.wait_for_timeout(4000)
+
+                # Detect video ads
+                is_video = page.query_selector('video') is not None
+
+                if not is_video:
+                    # Find the largest fbcdn image on the page (the ad creative)
+                    images = page.query_selector_all('img[src*="fbcdn"]')
+                    best_src = None
+                    best_area = 0
+                    for img in images:
+                        try:
+                            box = img.bounding_box()
+                            src = img.get_attribute('src')
+                            if box and src and box['width'] > 80 and box['height'] > 80:
+                                area = box['width'] * box['height']
+                                if area > best_area:
+                                    best_area = area
+                                    best_src = src
+                        except Exception:
+                            pass
+
+                    if best_src:
+                        # Fetch the actual ad creative image (clean, no Facebook chrome)
+                        img_req = urllib.request.Request(best_src)
+                        img_req.add_header('User-Agent', FALLBACK_USER_AGENT)
+                        img_req.add_header('Referer', 'https://www.facebook.com/')
+                        try:
+                            with urllib.request.urlopen(img_req, timeout=15) as r:
+                                img_data = r.read()
+                        except Exception as e:
+                            sys.stderr.write(f"[snap-img] img fetch failed: {e}\n")
+
+                    if not img_data:
+                        # Fall back to screenshotting just the ad creative area
+                        # Try to find and screenshot the main image element
+                        el = page.query_selector('div[data-testid="ad-creative"] img, img[src*="fbcdn"]')
+                        if el:
+                            img_data = el.screenshot(type='jpeg', quality=85)
+                        else:
+                            img_data = page.screenshot(type='jpeg', quality=80,
+                                                       clip={'x': 0, 'y': 60, 'width': 800, 'height': 600})
                 browser.close()
 
-            # Cache on Volume
-            with open(cache_path, 'wb') as f:
-                f.write(screenshot)
-            sys.stderr.write(f"[snap-img] ok {ad_id} ({len(screenshot)} bytes)\n")
+            if is_video:
+                sys.stderr.write(f"[snap-img] video ad skipped: {ad_id}\n")
+                # Return 204 so frontend knows to hide this card
+                self.send_response(204)
+                self._add_cors()
+                self.end_headers()
+                return
 
+            # Cache and serve
+            with open(cache_path, 'wb') as f:
+                f.write(img_data)
+            sys.stderr.write(f"[snap-img] ok {ad_id} ({len(img_data)} bytes)\n")
             self.send_response(200)
             self._add_cors()
             self.send_header('Content-Type', 'image/jpeg')
-            self.send_header('Content-Length', str(len(screenshot)))
+            self.send_header('Content-Length', str(len(img_data)))
             self.send_header('Cache-Control', 'public, max-age=86400')
             self.end_headers()
-            self.wfile.write(screenshot)
+            self.wfile.write(img_data)
         except Exception as e:
             sys.stderr.write(f"[snap-img] failed {ad_id}: {e}\n")
             self.send_error(502)

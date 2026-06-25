@@ -859,13 +859,13 @@
         <div x-show="metaSearch.results.length > 0">
           <div class="text-xs text-muted mb-3" x-text="metaSearch.results.length + ' ads found — click any card to view, Save to add to references'"></div>
           <div class="grid grid-cols-4 gap-3">
-            <template x-for="(ad, idx) in metaSearch.results" :key="ad.id">
+            <template x-for="(ad, idx) in metaSearch.results.filter(a => !a._isVideo)" :key="ad.id">
               <div class="card overflow-hidden">
                 <!-- Ad screenshot (rendered server-side via Playwright, cached on Volume) -->
                 <div class="aspect-square bg-bg-elev relative overflow-hidden">
                   <img :src="ad.imageUrl" class="w-full h-full object-cover"
                     loading="lazy"
-                    @error="$el.src='/meta-snap?id=' + ad.id + '&t=' + Date.now()">
+                    @error="fetch(ad.imageUrl,{method:'HEAD'}).then(r=>{ if(r.status===204) ad._isVideo=true })"
                   <!-- Loading spinner until image appears -->
                   <div class="absolute inset-0 flex items-center justify-center text-muted text-xs pointer-events-none"
                     x-show="!ad._imgLoaded"
