@@ -557,7 +557,7 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
 
     # --- Meta ad snapshot image extractor ---
     def _snap_img_handler(self):
-        import re as _re
+        import re as _re, json as _json
         qs = parse_qs(urlparse(self.path).query)
         ad_id = qs.get('id', [None])[0]
         if not ad_id or not META_TOKEN:
@@ -566,19 +566,33 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
         try:
             req = urllib.request.Request(snapshot_url)
             req.add_header('User-Agent', FALLBACK_USER_AGENT)
-            req.add_header('Accept', 'text/html')
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            req.add_header('Accept', 'text/html,application/xhtml+xml')
+            req.add_header('Accept-Language', 'en-US,en;q=0.9')
+            with urllib.request.urlopen(req, timeout=20) as resp:
                 html = resp.read().decode('utf-8', errors='ignore')
-            # Try og:image first
-            m = _re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html)
-            if not m:
-                m = _re.search(r'content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html)
-            # Fall back to first large <img> src
-            if not m:
-                m = _re.search(r'<img[^>]+src=["\']([^"\']+fbcdn[^"\']+)["\']', html)
-            if not m:
+
+            img_url = None
+
+            # 1. Look for fbcdn.net image URLs in JSON data blobs inside <script> tags
+            # Facebook embeds page data as JSON in __bbox / __data patterns
+            for pattern in [
+                r'"uri"\s*:\s*"(https://[^"]*fbcdn\.net[^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"',
+                r'"src"\s*:\s*"(https://[^"]*fbcdn\.net[^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"',
+                r'"image_url"\s*:\s*"(https://[^"]*fbcdn\.net[^"]*)"',
+                r'<img[^>]+src="(https://[^"]*fbcdn\.net[^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"',
+                r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
+            ]:
+                m = _re.search(pattern, html)
+                if m:
+                    candidate = m.group(1).replace('\\u0025', '%').replace('\\/', '/').replace('&amp;', '&')
+                    if 'fbcdn.net' in candidate or candidate.startswith('https://'):
+                        img_url = candidate
+                        break
+
+            if not img_url:
+                sys.stderr.write(f"[snap-img] no image found for {ad_id}\n")
                 self.send_error(404); return
-            img_url = m.group(1).replace('&amp;', '&')
+
             img_req = urllib.request.Request(img_url)
             img_req.add_header('User-Agent', FALLBACK_USER_AGENT)
             img_req.add_header('Referer', 'https://www.facebook.com/')

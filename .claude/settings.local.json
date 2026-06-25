@@ -10,7 +10,10 @@
       "Bash(python3 -m json.tool)",
       "Bash(curl -s \"https://tbc-ad-generator-production.up.railway.app/meta/ads_archive?search_terms=Zooplus&ad_reached_countries=%5B%22DE%22%5D&ad_type=ALL&fields=id,page_name,ad_snapshot_url&limit=3\")",
       "Bash(curl -s \"https://tbc-ad-generator-production.up.railway.app/meta/me?fields=id,name\")",
-      "WebFetch(domain:developers.facebook.com)"
+      "WebFetch(domain:developers.facebook.com)",
+      "Bash(curl -s \"https://tbc-ad-generator-production.up.railway.app/meta/ads_archive?search_terms=untamedcatfood&ad_reached_countries=%5B%22GB%22%5D&ad_type=ALL&fields=id,page_name&limit=3\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(d['id']\\) for d in data.get\\('data',[]\\)]\")",
+      "Bash(curl *)"
     ]
   }
 }

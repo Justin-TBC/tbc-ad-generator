@@ -861,10 +861,13 @@
           <div class="grid grid-cols-4 gap-3">
             <template x-for="(ad, idx) in metaSearch.results" :key="ad.id">
               <div class="card overflow-hidden">
-                <!-- Ad image -->
+                <!-- Ad preview via iframe (renders actual Facebook ad creative) -->
                 <div class="aspect-square bg-bg-elev relative overflow-hidden">
-                  <img :src="ad.imageUrl" class="w-full h-full object-cover"
-                    @error="$el.style.display='none'">
+                  <iframe :src="ad.snapshotUrl"
+                    class="w-full border-0 pointer-events-none"
+                    style="height:400%;transform:scale(0.25);transform-origin:top left;width:400%"
+                    sandbox="allow-scripts allow-same-origin"
+                    loading="lazy"></iframe>
                   <div x-show="ad.saved" class="absolute top-1 right-1 chip chip-success text-xs">✓ Saved</div>
                 </div>
                 <!-- Footer -->
@@ -1865,7 +1868,7 @@ function app() {
         'id', 'page_name', 'ad_creative_bodies',
         'ad_creative_link_titles', 'ad_creative_link_captions',
         'ad_snapshot_url', 'ad_delivery_start_time',
-        'ad_creative_images',
+        'ad_creative_images', 'ad_creative_media_type',
       ].join(',');
 
       const params = new URLSearchParams({
@@ -1887,19 +1890,24 @@ function app() {
         }
         const data = await res.json();
 
-        const mapped = (data.data || []).map(ad => ({
-          id: ad.id,
-          pageName: ad.page_name || 'Unknown page',
-          body: (ad.ad_creative_bodies || [])[0] || '',
-          title: (ad.ad_creative_link_titles || [])[0] || '',
-          caption: (ad.ad_creative_link_captions || [])[0] || '',
-          snapshotUrl: ad.ad_snapshot_url || '',
-          startDate: ad.ad_delivery_start_time || '',
-          // Fetch actual ad image from snapshot page via server-side proxy
-          imageUrl: `/meta-snap?id=${ad.id}`,
-          saving: false,
-          saved: false,
-        }));
+        const mapped = (data.data || [])
+          // Filter out video ads — keep only image/unknown media types
+          .filter(ad => {
+            const mt = (ad.ad_creative_media_type || '').toLowerCase();
+            return mt !== 'video' && mt !== 'reel';
+          })
+          .map(ad => ({
+            id: ad.id,
+            pageName: ad.page_name || 'Unknown page',
+            body: (ad.ad_creative_bodies || [])[0] || '',
+            title: (ad.ad_creative_link_titles || [])[0] || '',
+            caption: (ad.ad_creative_link_captions || [])[0] || '',
+            snapshotUrl: ad.ad_snapshot_url || '',
+            startDate: ad.ad_delivery_start_time || '',
+            imageUrl: `/meta-snap?id=${ad.id}`,
+            saving: false,
+            saved: false,
+          }));
 
         this.metaSearch.results = loadMore ? [...this.metaSearch.results, ...mapped] : mapped;
         this.metaSearch.hasMore = !!data.paging?.cursors?.after && (data.data||[]).length === 24;
