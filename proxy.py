@@ -555,59 +555,64 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
 
         self.send_error(404)
 
-    # --- Meta ad snapshot image extractor ---
+    # --- Meta ad snapshot screenshot via Playwright ---
     def _snap_img_handler(self):
-        import re as _re, json as _json
         qs = parse_qs(urlparse(self.path).query)
         ad_id = qs.get('id', [None])[0]
         if not ad_id or not META_TOKEN:
             self.send_error(400); return
-        snapshot_url = f"https://www.facebook.com/ads/archive/render_ad/?id={ad_id}&access_token={META_TOKEN}"
-        try:
-            req = urllib.request.Request(snapshot_url)
-            req.add_header('User-Agent', FALLBACK_USER_AGENT)
-            req.add_header('Accept', 'text/html,application/xhtml+xml')
-            req.add_header('Accept-Language', 'en-US,en;q=0.9')
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                html = resp.read().decode('utf-8', errors='ignore')
 
-            img_url = None
+        os.makedirs(ASSETS_DIR, exist_ok=True)
+        cache_path = os.path.join(ASSETS_DIR, f'meta_snap_{ad_id}.jpg')
 
-            # 1. Look for fbcdn.net image URLs in JSON data blobs inside <script> tags
-            # Facebook embeds page data as JSON in __bbox / __data patterns
-            for pattern in [
-                r'"uri"\s*:\s*"(https://[^"]*fbcdn\.net[^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"',
-                r'"src"\s*:\s*"(https://[^"]*fbcdn\.net[^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"',
-                r'"image_url"\s*:\s*"(https://[^"]*fbcdn\.net[^"]*)"',
-                r'<img[^>]+src="(https://[^"]*fbcdn\.net[^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"',
-                r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"',
-            ]:
-                m = _re.search(pattern, html)
-                if m:
-                    candidate = m.group(1).replace('\\u0025', '%').replace('\\/', '/').replace('&amp;', '&')
-                    if 'fbcdn.net' in candidate or candidate.startswith('https://'):
-                        img_url = candidate
-                        break
-
-            if not img_url:
-                sys.stderr.write(f"[snap-img] no image found for {ad_id}\n")
-                self.send_error(404); return
-
-            img_req = urllib.request.Request(img_url)
-            img_req.add_header('User-Agent', FALLBACK_USER_AGENT)
-            img_req.add_header('Referer', 'https://www.facebook.com/')
-            with urllib.request.urlopen(img_req, timeout=15) as img_resp:
-                data = img_resp.read()
-                ct = img_resp.getheader('Content-Type', 'image/jpeg')
+        # Serve from cache if available
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as f:
+                data = f.read()
             self.send_response(200)
             self._add_cors()
-            self.send_header('Content-Type', ct)
+            self.send_header('Content-Type', 'image/jpeg')
             self.send_header('Content-Length', str(len(data)))
-            self.send_header('Cache-Control', 'public, max-age=3600')
+            self.send_header('Cache-Control', 'public, max-age=86400')
             self.end_headers()
             self.wfile.write(data)
+            return
+
+        try:
+            from playwright.sync_api import sync_playwright
+            snapshot_url = f"https://www.facebook.com/ads/archive/render_ad/?id={ad_id}&access_token={META_TOKEN}"
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                ctx = browser.new_context(
+                    viewport={'width': 600, 'height': 600},
+                    user_agent=FALLBACK_USER_AGENT
+                )
+                page = ctx.new_page()
+                page.goto(snapshot_url, wait_until='domcontentloaded', timeout=30000)
+                page.wait_for_timeout(3000)
+                screenshot = page.screenshot(
+                    type='jpeg', quality=85,
+                    clip={'x': 0, 'y': 0, 'width': 600, 'height': 600}
+                )
+                browser.close()
+
+            # Cache on Volume
+            with open(cache_path, 'wb') as f:
+                f.write(screenshot)
+            sys.stderr.write(f"[snap-img] ok {ad_id} ({len(screenshot)} bytes)\n")
+
+            self.send_response(200)
+            self._add_cors()
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Content-Length', str(len(screenshot)))
+            self.send_header('Cache-Control', 'public, max-age=86400')
+            self.end_headers()
+            self.wfile.write(screenshot)
         except Exception as e:
-            sys.stderr.write(f"[snap-img] {ad_id}: {e}\n")
+            sys.stderr.write(f"[snap-img] failed {ad_id}: {e}\n")
             self.send_error(502)
 
     # --- Image proxy (bypasses CORS for Facebook CDN images) ---
