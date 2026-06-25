@@ -10,6 +10,7 @@ Verwendung:
 """
 from __future__ import annotations
 
+import hashlib
 import http.server
 import json
 import os
@@ -119,6 +120,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _is_snap_img(self):
         return self.path.startswith("/meta-snap")
 
+    def _is_meta_snapshot(self):
+        return self.path.startswith("/meta-snapshot")
+
+    def _is_meta_image(self):
+        return self.path.startswith("/meta-image")
+
     def _is_assets(self):
         return self.path.startswith(ASSETS_PREFIX + "/") or self.path == ASSETS_PREFIX
 
@@ -129,8 +136,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif self._is_shopify():     self._shopify_proxy()
         elif self._is_meta():        self._meta_proxy()
         elif self._is_assets():      self._assets_handler()
-        elif self._is_img_proxy():   self._img_proxy_handler()
-        elif self._is_snap_img():    self._snap_img_handler()
+        elif self._is_img_proxy():      self._img_proxy_handler()
+        elif self._is_snap_img():       self._snap_img_handler()
+        elif self._is_meta_snapshot():  self._meta_snapshot_handler()
+        elif self._is_meta_image():     self._meta_image_handler()
         else:                        super().do_GET()
 
     def do_POST(self):
@@ -684,6 +693,120 @@ code{{background:#1c1c1f;border:1px solid #2a2a2e;padding:.25rem .5rem;border-ra
                 self.wfile.write(data)
         except Exception as e:
             sys.stderr.write(f"[img-proxy] failed: {e}\n")
+            self.send_error(502)
+
+    # --- /meta-snapshot?url=... → JSON {imageUrl, advertiser, adText, isVideo} ---
+    def _meta_snapshot_handler(self):
+        qs = parse_qs(urlparse(self.path).query)
+        snapshot_url = qs.get('url', [None])[0]
+        if not snapshot_url:
+            self._json_ok({'error': 'missing url'}); return
+
+        os.makedirs(ASSETS_DIR, exist_ok=True)
+        cache_key = hashlib.md5(snapshot_url.encode()).hexdigest()
+        cache_path = os.path.join(ASSETS_DIR, f'meta_info_{cache_key}.json')
+
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as f: data = f.read()
+            self.send_response(200); self._add_cors()
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers(); self.wfile.write(data); return
+
+        result = {'imageUrl': None, 'advertiser': '', 'adText': '', 'isVideo': False, 'error': None}
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                ctx = browser.new_context(viewport={'width': 800, 'height': 1000}, user_agent=FALLBACK_USER_AGENT)
+                page = ctx.new_page()
+                page.goto(snapshot_url, wait_until='domcontentloaded', timeout=30000)
+                page.wait_for_timeout(3000)
+
+                result['isVideo'] = page.query_selector('video') is not None
+
+                if not result['isVideo']:
+                    # Find the largest fbcdn image (the ad creative — filter small profile pics)
+                    images = page.query_selector_all('img[src*="fbcdn"], img[src*="scontent"]')
+                    best = (0, None)
+                    for img in images:
+                        try:
+                            box = img.bounding_box()
+                            src = img.get_attribute('src') or ''
+                            if box and src and box['width'] >= 200 and box['height'] >= 200:
+                                area = box['width'] * box['height']
+                                if area > best[0]:
+                                    best = (area, src)
+                        except Exception:
+                            pass
+                    result['imageUrl'] = best[1]
+
+                # Advertiser name
+                for sel in ['strong a', '[role="heading"]', 'strong', 'h4']:
+                    try:
+                        el = page.query_selector(sel)
+                        if el:
+                            txt = (el.inner_text() or '').strip()
+                            if txt and len(txt) < 80:
+                                result['advertiser'] = txt; break
+                    except Exception:
+                        pass
+
+                # Ad body text
+                try:
+                    els = page.query_selector_all('div[data-ad-comet-preview], div[dir="auto"]')
+                    for el in els:
+                        txt = (el.inner_text() or '').strip()
+                        if len(txt) > 20:
+                            result['adText'] = txt[:300]; break
+                except Exception:
+                    pass
+
+                browser.close()
+
+            data = json.dumps(result).encode()
+            with open(cache_path, 'wb') as f: f.write(data)
+            sys.stderr.write(f"[meta-snapshot] ok isVideo={result['isVideo']} imageUrl={'yes' if result['imageUrl'] else 'no'}\n")
+        except Exception as e:
+            sys.stderr.write(f"[meta-snapshot] error: {e}\n")
+            result['error'] = str(e)
+            data = json.dumps(result).encode()
+
+        self.send_response(200); self._add_cors()
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers(); self.wfile.write(data)
+
+    def _json_ok(self, obj):
+        data = json.dumps(obj).encode()
+        self.send_response(200); self._add_cors()
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers(); self.wfile.write(data)
+
+    # --- /meta-image?url=... → stream remote image bytes (bypasses browser CORS) ---
+    def _meta_image_handler(self):
+        qs = parse_qs(urlparse(self.path).query)
+        img_url = qs.get('url', [None])[0]
+        if not img_url:
+            self.send_error(400); return
+        try:
+            req = urllib.request.Request(img_url)
+            req.add_header('User-Agent', FALLBACK_USER_AGENT)
+            req.add_header('Referer', 'https://www.facebook.com/')
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = resp.read()
+                ct = resp.getheader('Content-Type', 'image/jpeg')
+            self.send_response(200); self._add_cors()
+            self.send_header('Content-Type', ct)
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'public, max-age=86400')
+            self.end_headers(); self.wfile.write(data)
+        except Exception as e:
+            sys.stderr.write(f"[meta-image] {e}\n")
             self.send_error(502)
 
     def _relay(self, status: int, headers, body: bytes):

@@ -857,30 +857,41 @@
         <div x-show="metaSearch.error" class="text-xs text-danger mb-3" x-text="metaSearch.error"></div>
         <!-- Results -->
         <div x-show="metaSearch.results.length > 0">
-          <div class="text-xs text-muted mb-3" x-text="metaSearch.results.length + ' ads found — click any card to view, Save to add to references'"></div>
+          <!-- Counter -->
+          <div class="text-xs text-muted mb-3">
+            <span x-text="metaSearch.results.filter(a => !a.isVideo && a.creativeImageUrl).length + ' Bild-Ads gefunden'"></span>
+            <span x-show="metaSearch.results.filter(a => a.isVideo).length > 0" class="ml-2 text-zinc-600"
+              x-text="'(' + metaSearch.results.filter(a => a.isVideo).length + ' Videos ausgeblendet)'"></span>
+            <span x-show="metaSearch.results.filter(a => a.snapshotLoading).length > 0" class="ml-2"
+              x-text="'· loading ' + metaSearch.results.filter(a => a.snapshotLoading).length + '…'"></span>
+          </div>
           <div class="grid grid-cols-4 gap-3">
-            <template x-for="(ad, idx) in metaSearch.results.filter(a => !a._isVideo)" :key="ad.id">
+            <template x-for="(ad, idx) in metaSearch.results.filter(a => !a.isVideo)" :key="ad.id">
               <div class="card overflow-hidden">
-                <!-- Ad screenshot (rendered server-side via Playwright, cached on Volume) -->
+                <!-- Creative image or loading state -->
                 <div class="aspect-square bg-bg-elev relative overflow-hidden">
-                  <img :src="ad.imageUrl" class="w-full h-full object-cover"
-                    loading="lazy"
-                    @error="fetch(ad.imageUrl,{method:'HEAD'}).then(r=>{ if(r.status===204) ad._isVideo=true })"
-                  <!-- Loading spinner until image appears -->
-                  <div class="absolute inset-0 flex items-center justify-center text-muted text-xs pointer-events-none"
-                    x-show="!ad._imgLoaded"
-                    x-init="$el.previousElementSibling.addEventListener('load', () => ad._imgLoaded = true)">
-                    <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
-                  </div>
+                  <template x-if="ad.creativeImageUrl">
+                    <img :src="ad.creativeImageUrl" class="w-full h-full object-cover" loading="lazy">
+                  </template>
+                  <template x-if="!ad.creativeImageUrl">
+                    <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted p-2 text-center">
+                      <template x-if="ad.snapshotLoading">
+                        <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+                      </template>
+                      <template x-if="!ad.snapshotLoading">
+                        <span class="text-xs" x-text="ad.snapshotError || 'No image'"></span>
+                      </template>
+                    </div>
+                  </template>
                   <div x-show="ad.saved" class="absolute top-1 right-1 chip chip-success text-xs">✓ Saved</div>
                 </div>
                 <!-- Footer -->
                 <div class="p-2">
-                  <div class="text-xs font-medium text-zinc-100 truncate" x-text="ad.pageName"></div>
+                  <div class="text-xs font-medium text-zinc-100 truncate" x-text="ad.advertiser || ad.pageName"></div>
                   <div class="flex items-center gap-2 mt-1.5">
                     <button class="btn text-xs py-1 px-2 flex-1 justify-center"
                       :class="ad.saved ? 'btn-secondary text-success' : 'btn-primary'"
-                      :disabled="ad.saving || ad.saved"
+                      :disabled="ad.saving || ad.saved || !ad.creativeImageUrl"
                       @click="saveMetaAdAsReference(ad, idx)">
                       <span x-show="!ad.saving && !ad.saved">☆ Save</span>
                       <span x-show="ad.saving">Saving…</span>
@@ -1893,29 +1904,31 @@ function app() {
         }
         const data = await res.json();
 
-        const mapped = (data.data || [])
-          // Filter out video ads — keep only image/unknown media types
-          .filter(ad => {
-            const mt = (ad.ad_creative_media_type || '').toLowerCase();
-            return mt !== 'video' && mt !== 'reel';
-          })
-          .map(ad => ({
-            id: ad.id,
-            pageName: ad.page_name || 'Unknown page',
-            body: (ad.ad_creative_bodies || [])[0] || '',
-            title: (ad.ad_creative_link_titles || [])[0] || '',
-            caption: (ad.ad_creative_link_captions || [])[0] || '',
-            snapshotUrl: ad.ad_snapshot_url || '',
-            startDate: ad.ad_delivery_start_time || '',
-            imageUrl: `/meta-snap?id=${ad.id}`,
-            saving: false,
-            saved: false,
-          }));
+        const mapped = (data.data || []).map(ad => ({
+          id: ad.id,
+          pageName: ad.page_name || 'Unknown page',
+          body: (ad.ad_creative_bodies || [])[0] || '',
+          title: (ad.ad_creative_link_titles || [])[0] || '',
+          caption: (ad.ad_creative_link_captions || [])[0] || '',
+          snapshotUrl: ad.ad_snapshot_url || '',
+          startDate: ad.ad_delivery_start_time || '',
+          // Snapshot-loaded fields (populated async by loadAdSnapshots)
+          creativeImageUrl: null,
+          advertiser: ad.page_name || '',
+          adText: '',
+          isVideo: false,
+          snapshotLoading: true,
+          snapshotError: null,
+          saving: false,
+          saved: false,
+        }));
 
         this.metaSearch.results = loadMore ? [...this.metaSearch.results, ...mapped] : mapped;
         this.metaSearch.hasMore = !!data.paging?.cursors?.after && (data.data||[]).length === 24;
         this.metaSearch.nextCursor = data.paging?.cursors?.after || null;
         this.metaSearch.error = '';
+        // Load snapshots in background (batches of 3 to avoid overloading Playwright)
+        this.loadAdSnapshots(mapped);
       } catch(e) {
         this.metaSearch.error = e.message.includes('META_ACCESS_TOKEN')
           ? 'META_ACCESS_TOKEN not set — add it in Railway environment variables.'
@@ -1925,66 +1938,80 @@ function app() {
       }
     },
 
+    async loadAdSnapshots(ads) {
+      const BATCH = 3;
+      for (let i = 0; i < ads.length; i += BATCH) {
+        await Promise.all(ads.slice(i, i + BATCH).map(ad => this.loadAdSnapshot(ad)));
+      }
+    },
+
+    async loadAdSnapshot(ad) {
+      if (!ad.snapshotUrl) { ad.snapshotLoading = false; return; }
+      try {
+        const res = await fetch(`/meta-snapshot?url=${encodeURIComponent(ad.snapshotUrl)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.error && !data.imageUrl) throw new Error(data.error);
+        ad.isVideo = data.isVideo || false;
+        if (!data.isVideo && data.imageUrl) {
+          // Route image through our proxy to bypass CORS
+          ad.creativeImageUrl = `/meta-image?url=${encodeURIComponent(data.imageUrl)}`;
+        }
+        if (data.advertiser) ad.advertiser = data.advertiser;
+        if (data.adText)     ad.adText = data.adText;
+      } catch(e) {
+        ad.snapshotError = e.message.slice(0, 60);
+      } finally {
+        ad.snapshotLoading = false;
+      }
+    },
+
     async saveMetaAdAsReference(ad, idx) {
-      if (ad.saved || ad.saving) return;
+      if (ad.saved || ad.saving || !ad.creativeImageUrl) return;
       ad.saving = true;
 
       let imageBlob = null;
-
-      // Fetch through proxy (ad.imageUrl is already /img-proxy?url=... so no CORS issue)
-      if (ad.imageUrl) {
-        try {
-          const res = await fetch(ad.imageUrl);
-          if (res.ok) imageBlob = await res.blob();
-        } catch(e) {
-          console.warn('[meta] Could not fetch ad image:', e.message);
-        }
+      try {
+        // creativeImageUrl = /meta-image?url=... — already routed through our proxy
+        const res = await fetch(ad.creativeImageUrl);
+        if (res.ok) imageBlob = await res.blob();
+      } catch(e) {
+        console.warn('[meta-save] image fetch failed:', e.message);
       }
 
-      // Fall back: screenshot the snapshot URL via a canvas-rendered image (not feasible in browser)
-      // If no image available, create a text-only placeholder blob so the reference can still be saved
-      if (!imageBlob) {
-        // Create a simple placeholder image with the ad text
-        const canvas = document.createElement('canvas');
-        canvas.width = 400; canvas.height = 400;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#1877F2';
-        ctx.fillRect(0, 0, 400, 400);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(ad.pageName, 200, 60);
-        ctx.font = '13px sans-serif';
-        const words = (ad.body || ad.title || 'No text').split(' ');
-        let line = '', y = 100;
-        for (const word of words) {
-          const test = line + word + ' ';
-          if (ctx.measureText(test).width > 360 && line) { ctx.fillText(line.trim(), 200, y); line = word + ' '; y += 22; }
-          else line = test;
-          if (y > 360) break;
-        }
-        if (line) ctx.fillText(line.trim(), 200, y);
-        ctx.font = '11px sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.fillText('Meta Ad Library — no image available', 200, 380);
-        await new Promise(r => canvas.toBlob(b => { imageBlob = b; r(); }, 'image/png'));
-      }
+      if (!imageBlob) { ad.saving = false; this.notify('Could not fetch ad image', 'error'); return; }
 
+      // Persist image to Volume (same as other references)
+      let imageServerId = null;
+      let imageUrl = null;
+      try {
+        const file = new File([imageBlob], `meta_${ad.id}.jpg`, { type: imageBlob.type || 'image/jpeg' });
+        imageServerId = await this.persistAsset(file, 'ref-competitor');
+        if (imageServerId) imageUrl = `/assets/serve/${imageServerId}`;
+      } catch(e) {}
+
+      const advertiser = ad.advertiser || ad.pageName;
+      const adText = ad.adText || ad.body || ad.title || '';
+
+      // Exact same shape as a manually uploaded competitor reference
       const ref = {
         id: this.uid(),
-        name: ad.pageName + (ad.title ? ` — ${ad.title.slice(0,40)}` : ''),
+        name: `${advertiser} — ${adText.slice(0, 40) || 'Meta Ad'}`,
         imageBlob,
-        tags: ['meta', 'competitor', this.metaSearch.country.toLowerCase()],
-        notes: [ad.body, ad.caption].filter(Boolean).join('\n'),
+        imageServerId,
+        imageUrl,
+        tags: ['meta', 'competitor', advertiser.toLowerCase().replace(/\s+/g, '-'), this.metaSearch.country.toLowerCase()],
+        notes: adText,
         sourceUrl: ad.snapshotUrl,
         extractedPrinciple: '',
         fromMeta: true,
       };
 
       this.references.push(ref);
+      this.saveReferenceAssets();
       ad.saving = false;
       ad.saved = true;
-      this.notify(`Saved "${ref.name.slice(0,40)}" to Competitors.`);
+      this.notify('Gespeichert — jetzt im Ads-Tab als Referenz nutzbar');
     },
 
     // Lazy-fetch blobs for Shopify product images just before generation
